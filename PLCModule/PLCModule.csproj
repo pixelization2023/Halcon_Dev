@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <UseWPF>true</UseWPF>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="HslCommunication" Version="12.8.2" />
+    <PackageReference Include="MaterialDesignColors" Version="5.3.1" />
+    <PackageReference Include="MaterialDesignThemes" Version="5.3.1" />
+    <PackageReference Include="MaterialDesignThemes.Wpf" Version="1.0.1" />
+    <PackageReference Include="Prism.DryIoc" Version="9.0.537" />
+    <PackageReference Include="Serilog" Version="4.3.1" />
+    <PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\MVS.Core\MVS.Core.csproj" />
+  </ItemGroup>
+
+</Project>

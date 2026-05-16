@@ -1,0 +1,82 @@
+* ---------------------------------------------------------------------------
+* HalconProcedureTemplate.hdev
+*
+* 检测过程模板 —— 演示 camerateset_AI（迁移后）与 Halcon 之间的接口约定。
+* 使用方式：把本文件复制到 {程序目录}\Product\{产品名}\ 下，
+*          在「检测配置」页面把过程名绑定到对应图片索引即可。
+*
+* 过程签名约定（变量名必须与配置中的模板一致）：
+*   输入图标参数: Image                     -> 待检测图像
+*   输入控制参数: ImageIndex                -> 当前图片序号（1 开始，运行前自动注入）
+*   输出控制参数: out0, out1, ...           -> 每个检测项目的判定字符串
+*                                             索引 = PCS序号 * 检测项目数 + 检测项序号
+*   输出图标参数: box0, box1, ...           -> 对应检测项的 NG 区域
+*   输出图标参数: image0, image1, ...       -> 每个 PCS 的结果图（可选）
+*
+* 结果字符串判定规则（与原 VisionMaster 项目一致）：
+*   仅 "OK"（忽略大小写）视为良品；空串或其它字符串一律按 NG 处理。
+* ---------------------------------------------------------------------------
+
+* 示例：单张图片 1 个 PCS、2 个检测项的最小流程
+procedure inspect_demo (Image, ImageIndex, out0, out1, box0, box1, image0)
+
+  * --- 预处理 -------------------------------------------------------------
+  get_image_size (Image, Width, Height)
+  rgb1_to_gray (Image, GrayImage)
+
+  * --- 检测项 0：区域内是否存在有效目标（示例用阈值 + 连通域） --------------
+  threshold (GrayImage, Region0, 60, 255)
+  connection (Region0, Connected0)
+  select_shape (Connected0, Defects0, 'area', 'and', 50, 9999999)
+  count_obj (Defects0, Count0)
+  if (Count0 > 0)
+    out0 := 'NG'
+    * 取最大缺陷作为 NG 框（区域会被自动转成矩形框）
+    select_shape_std (Defects0, BoxRegion0, 'max_area', 70)
+    copy_obj (BoxRegion0, box0, 1, -1)
+  else
+    out0 := 'OK'
+    gen_empty_obj (box0)
+  endif
+
+  * --- 检测项 1：另一种判定（示例用边缘/直线拟合） ------------------------
+  edges_sub_pix (GrayImage, Edges, 'canny', 1.0, 20, 40)
+  count_obj (Edges, EdgeCount)
+  if (EdgeCount > 8)
+    out1 := 'NG'
+    union1 (Edges, EdgeUnion)
+    box1 := EdgeUnion
+  else
+    out1 := 'OK'
+    * 提供一个空区域，保证 box1 始终可读，避免上层取值失败
+    gen_empty_obj (box1)
+  endif
+
+  * --- 结果图：直接把原图作为 PCS 结果图输出 ------------------------------
+  copy_image (Image, image0)
+
+  return ()
+
+endprocedure
+
+
+* ---------------------------------------------------------------------------
+* 扫码过程模板：过程名必须包含「扫码」，或使用 ScanCode。
+* 输出参数名默认取 code（可在「检测配置」中修改）。
+* ---------------------------------------------------------------------------
+procedure 扫码 (Image, ImageIndex, code)
+
+  rgb1_to_gray (Image, GrayImage)
+  create_bar_code_model ([], [], BarCodeHandle)
+  find_bar_code (GrayImage, GrayImage, BarCodeHandle, 'auto', DecodedData, DecodedDataStrings)
+  tuple_length (DecodedDataStrings, Count)
+  if (Count > 0)
+    code := DecodedDataStrings[0]
+  else
+    code := ''
+  endif
+  clear_bar_code_model (BarCodeHandle)
+
+  return ()
+
+endprocedure

@@ -1,0 +1,34 @@
+<ResourceDictionary
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="clr-namespace:HalconView" xmlns:HalconDotNet="clr-namespace:HalconDotNet;assembly=halcondotnet">
+
+    <Style TargetType="{x:Type local:HalconView}">
+        <!--  用 DynamicResource 引用宿主应用的主题画刷，切换主题时实时跟随；找不到时保留 WPF 默认值  -->
+        <Setter Property="Background" Value="{DynamicResource CanvasBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource CardBorderBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="{x:Type local:HalconView}">
+                    <Border Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            CornerRadius="8"
+                            ClipToBounds="True">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="*" />
+                            </Grid.RowDefinitions>
+                            <HalconDotNet:HSmartWindowControlWPF
+                                x:Name="PART_HalconControl"
+                                HorizontalAlignment="Stretch"
+                                VerticalAlignment="Stretch"
+                                HDraw="fill" />
+                        </Grid>
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+</ResourceDictionary>

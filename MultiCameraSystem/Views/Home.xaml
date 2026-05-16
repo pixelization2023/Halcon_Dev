@@ -1,0 +1,234 @@
+<UserControl
+    x:Class="MultiCameraSystem.Views.Home"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+    xmlns:prism="http://prismlibrary.com/"
+    prism:ViewModelLocator.AutoWireViewModel="True"
+    Background="Transparent">
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!--  页面头  -->
+        <Grid Grid.Row="0" Margin="0,0,0,20">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <StackPanel>
+                <TextBlock Style="{StaticResource PageTitle}" Text="欢迎使用 CCD 视觉检测系统" />
+                <TextBlock
+                    Margin="0,6,0,0"
+                    Style="{StaticResource MutedText}"
+                    Text="多相机管理平台 · 在线检测 · 实时监控" />
+            </StackPanel>
+            <Button
+                Grid.Column="1"
+                VerticalAlignment="Bottom"
+                Command="{Binding RefreshCommand}"
+                Content="刷新状态"
+                Style="{StaticResource ControlButton}" />
+        </Grid>
+
+        <!-- 快捷信息卡片组 4列 -->
+        <WrapPanel Grid.Row="1" Margin="0,0,0,24">
+
+            <!-- 卡片1: 相机总数 -->
+            <Border
+                Width="212"
+                Margin="0,0,14,14"
+                Style="{StaticResource MetricCard}">
+                <StackPanel>
+                    <StackPanel Orientation="Horizontal">
+                        <materialDesign:PackIcon
+                            Width="16"
+                            Height="16"
+                            VerticalAlignment="Center"
+                            Foreground="{DynamicResource PrimaryBrush}"
+                            Kind="Camera" />
+                        <TextBlock
+                            Margin="8,0,0,0"
+                            Style="{StaticResource DataLabel}"
+                            Text="可用相机" />
+                    </StackPanel>
+                    <TextBlock
+                        Margin="0,8,0,0"
+                        Style="{StaticResource MetricValue}"
+                        Text="{Binding CameraCount, StringFormat={}{0} 台}" />
+                    <TextBlock
+                        Margin="0,4,0,0"
+                        Style="{StaticResource MutedText}"
+                        Text="{Binding ConnectedCount, StringFormat=已连接 {0} 台}" />
+                </StackPanel>
+            </Border>
+
+            <!-- 卡片2: 系统状态 -->
+            <Border
+                Width="212"
+                Margin="0,0,14,14"
+                Style="{StaticResource MetricCard}">
+                <StackPanel>
+                    <StackPanel Orientation="Horizontal">
+                        <materialDesign:PackIcon
+                            Width="16"
+                            Height="16"
+                            VerticalAlignment="Center"
+                            Foreground="{DynamicResource SuccessBrush}"
+                            Kind="CheckCircleOutline" />
+                        <TextBlock
+                            Margin="8,0,0,0"
+                            Style="{StaticResource DataLabel}"
+                            Text="系统状态" />
+                    </StackPanel>
+                    <StackPanel Margin="0,10,0,0" Orientation="Horizontal">
+                        <Ellipse Width="10" Height="10" Margin="0,0,8,0" VerticalAlignment="Center">
+                            <Ellipse.Style>
+                                <Style TargetType="Ellipse">
+                                    <Setter Property="Fill" Value="{DynamicResource SuccessBrush}" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsError}" Value="True">
+                                            <Setter Property="Fill" Value="{DynamicResource ErrorBrush}" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Ellipse.Style>
+                        </Ellipse>
+                        <TextBlock FontSize="16" FontWeight="SemiBold"
+                            Foreground="{DynamicResource TextPrimaryBrush}" Text="{Binding SystemStatus}" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <!-- 卡片3: 图像保存路径 -->
+            <Border
+                Width="212"
+                Margin="0,0,14,14"
+                Style="{StaticResource MetricCard}">
+                <StackPanel>
+                    <StackPanel Orientation="Horizontal">
+                        <materialDesign:PackIcon
+                            Width="16"
+                            Height="16"
+                            VerticalAlignment="Center"
+                            Foreground="{DynamicResource WarningBrush}"
+                            Kind="FolderOpen" />
+                        <TextBlock
+                            Margin="8,0,0,0"
+                            Style="{StaticResource DataLabel}"
+                            Text="图像保存路径" />
+                    </StackPanel>
+                    <TextBlock
+                        Margin="0,10,0,0"
+                        FontSize="13"
+                        Foreground="{DynamicResource TextPrimaryBrush}"
+                        Text="{Binding ImagePath}"
+                        TextTrimming="CharacterEllipsis" />
+                </StackPanel>
+            </Border>
+
+            <!-- 卡片4: 系统时间 -->
+            <Border
+                Width="212"
+                Margin="0,0,0,14"
+                Style="{StaticResource MetricCard}">
+                <StackPanel>
+                    <StackPanel Orientation="Horizontal">
+                        <materialDesign:PackIcon
+                            Width="16"
+                            Height="16"
+                            VerticalAlignment="Center"
+                            Foreground="{DynamicResource AccentBrush}"
+                            Kind="ClockOutline" />
+                        <TextBlock
+                            Margin="8,0,0,0"
+                            Style="{StaticResource DataLabel}"
+                            Text="系统时间" />
+                    </StackPanel>
+                    <TextBlock
+                        Margin="0,12,0,0"
+                        FontFamily="Consolas"
+                        FontSize="15"
+                        FontWeight="SemiBold"
+                        Foreground="{DynamicResource TextPrimaryBrush}"
+                        Text="{Binding SystemTime}" />
+                </StackPanel>
+            </Border>
+        </WrapPanel>
+
+        <!-- 导航入口卡片 -->
+        <StackPanel Grid.Row="3">
+            <TextBlock Margin="0,0,0,16" Style="{StaticResource SectionTitle}" Text="快速导航" />
+
+            <UniformGrid Columns="3" Rows="1">
+                <!-- 相机管理 -->
+                <Border Margin="0,0,12,0" Style="{StaticResource CardBorder}">
+                    <Button Height="Auto" Padding="0" HorizontalContentAlignment="Stretch"
+                            Command="{Binding NavigateToCameraManagerCommand}"
+                            Cursor="Hand" Style="{StaticResource MaterialDesignFlatButton}">
+                        <StackPanel>
+                            <Border Width="56" Height="56" Margin="0,0,0,16"
+                                    Background="{DynamicResource PrimaryTintBrush}" CornerRadius="14">
+                                <materialDesign:PackIcon Width="28" Height="28"
+                                    HorizontalAlignment="Center" VerticalAlignment="Center"
+                                    Foreground="{DynamicResource PrimaryBrush}" Kind="CameraControl" />
+                            </Border>
+                            <TextBlock FontSize="16" FontWeight="SemiBold"
+                                Foreground="{DynamicResource TextPrimaryBrush}" Text="相机管理" />
+                            <TextBlock Margin="0,4,0,0" FontSize="12"
+                                Foreground="{DynamicResource TextMutedBrush}"
+                                Text="设备连接、参数配置与实时采集" TextWrapping="Wrap" />
+                        </StackPanel>
+                    </Button>
+                </Border>
+
+                <!-- 流程测试 -->
+                <Border Margin="6,0,6,0" Style="{StaticResource CardBorder}">
+                    <Button Height="Auto" Padding="0" HorizontalContentAlignment="Stretch"
+                            Command="{Binding NavigateTestViewCommand}"
+                            Cursor="Hand" Style="{StaticResource MaterialDesignFlatButton}">
+                        <StackPanel>
+                            <Border Width="56" Height="56" Margin="0,0,0,16"
+                                    Background="{DynamicResource WarningTintBrush}" CornerRadius="14">
+                                <materialDesign:PackIcon Width="28" Height="28"
+                                    HorizontalAlignment="Center" VerticalAlignment="Center"
+                                    Foreground="{DynamicResource WarningBrush}" Kind="FlaskOutline" />
+                            </Border>
+                            <TextBlock FontSize="16" FontWeight="SemiBold"
+                                Foreground="{DynamicResource TextPrimaryBrush}" Text="流程测试" />
+                            <TextBlock Margin="0,4,0,0" FontSize="12"
+                                Foreground="{DynamicResource TextMutedBrush}"
+                                Text="Halcon 引擎脚本测试与调试" TextWrapping="Wrap" />
+                        </StackPanel>
+                    </Button>
+                </Border>
+
+                <!-- 运行界面 -->
+                <Border Margin="12,0,0,0" Style="{StaticResource CardBorder}">
+                    <Button Height="Auto" Padding="0" HorizontalContentAlignment="Stretch"
+                            Command="{Binding NavigateRunViewCommand}"
+                            Cursor="Hand" Style="{StaticResource MaterialDesignFlatButton}">
+                        <StackPanel>
+                            <Border Width="56" Height="56" Margin="0,0,0,16"
+                                    Background="{DynamicResource SuccessTintBrush}" CornerRadius="14">
+                                <materialDesign:PackIcon Width="28" Height="28"
+                                    HorizontalAlignment="Center" VerticalAlignment="Center"
+                                    Foreground="{DynamicResource SuccessBrush}" Kind="PlayCircle" />
+                            </Border>
+                            <TextBlock FontSize="16" FontWeight="SemiBold"
+                                Foreground="{DynamicResource TextPrimaryBrush}" Text="运行界面" />
+                            <TextBlock Margin="0,4,0,0" FontSize="12"
+                                Foreground="{DynamicResource TextMutedBrush}"
+                                Text="在线检测与实时结果展示" TextWrapping="Wrap" />
+                        </StackPanel>
+                    </Button>
+                </Border>
+            </UniformGrid>
+        </StackPanel>
+    </Grid>
+</UserControl>

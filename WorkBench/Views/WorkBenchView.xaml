@@ -1,0 +1,344 @@
+<UserControl
+    x:Class="WorkBench.Views.WorkBenchView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+    xmlns:prism="http://prismlibrary.com/"
+    prism:ViewModelLocator.AutoWireViewModel="True"
+    Background="Transparent">
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!--  页面头：标题 + 状态 + 运行控制  -->
+        <Grid Grid.Row="0" Margin="0,0,0,16">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <StackPanel>
+                <TextBlock Style="{StaticResource PageTitle}" Text="工作台" />
+                <TextBlock
+                    Margin="0,6,0,0"
+                    Style="{StaticResource MutedText}"
+                    Text="{Binding Status}" />
+            </StackPanel>
+            <StackPanel
+                Grid.Column="1"
+                VerticalAlignment="Bottom"
+                Orientation="Horizontal">
+                <Button
+                    Margin="0,0,8,0"
+                    Command="{Binding StopCommand}"
+                    Content="⏹ 停止"
+                    IsEnabled="{Binding IsRunning}"
+                    Style="{StaticResource DangerButton}" />
+                <Button
+                    Command="{Binding RunCommand}"
+                    Content="▶ 运行流程"
+                    IsEnabled="{Binding CanRun}"
+                    Style="{StaticResource SuccessButton}" />
+            </StackPanel>
+        </Grid>
+
+        <!--  流程参数  -->
+        <Border Grid.Row="1" Margin="0,0,0,14" Style="{StaticResource CardBorder}">
+            <StackPanel Orientation="Horizontal">
+                <TextBlock
+                    Margin="0,0,8,0"
+                    Style="{StaticResource DataLabel}"
+                    Text="流程名称" />
+                <TextBox
+                    Width="180"
+                    Style="{StaticResource DarkTextBox}"
+                    Text="{Binding WorkflowName, UpdateSourceTrigger=PropertyChanged}" />
+                <TextBlock
+                    Margin="24,0,8,0"
+                    Style="{StaticResource DataLabel}"
+                    Text="全局超时(s)" />
+                <TextBox
+                    Width="70"
+                    Style="{StaticResource DarkTextBox}"
+                    Text="{Binding GlobalTimeoutSeconds, UpdateSourceTrigger=PropertyChanged}" />
+                <TextBlock
+                    Margin="24,0,8,0"
+                    Style="{StaticResource DataLabel}"
+                    Text="重试次数" />
+                <TextBox
+                    Width="60"
+                    Style="{StaticResource DarkTextBox}"
+                    Text="{Binding MaxRetries, UpdateSourceTrigger=PropertyChanged}" />
+            </StackPanel>
+        </Border>
+
+        <!-- 主区域：左构建 / 右结果 -->
+        <Grid Grid.Row="2">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="380" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <!-- 左侧：步骤构建区 -->
+            <Border Grid.Column="0" Margin="0,0,8,0" Padding="12" Style="{StaticResource CardBorder}">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Grid.Row="0" Margin="0,0,0,6" FontSize="13" FontWeight="SemiBold"
+                               Foreground="{DynamicResource TextPrimaryBrush}" Text="添加步骤" />
+
+                    <!-- 快捷添加按钮 -->
+                    <WrapPanel Grid.Row="1" Margin="0,0,0,8">
+                        <Button Height="26" Margin="0,2,4,2" Padding="8,0" FontSize="10"
+                                Content="📷 采集" Style="{StaticResource MaterialDesignFlatButton}"
+                                Foreground="{DynamicResource TextSecondaryBrush}"
+                                Command="{Binding AddStepCommand}"
+                                CommandParameter="图像采集 (Acquisition)" />
+                        <Button Height="26" Margin="0,2,4,2" Padding="8,0" FontSize="10"
+                                Content="🔬 检测" Style="{StaticResource MaterialDesignFlatButton}"
+                                Foreground="{DynamicResource TextSecondaryBrush}"
+                                Command="{Binding AddStepCommand}"
+                                CommandParameter="HALCON 检测 (Inspection)" />
+                        <Button Height="26" Margin="0,2,4,2" Padding="8,0" FontSize="10"
+                                Content="📊 判定" Style="{StaticResource MaterialDesignFlatButton}"
+                                Foreground="{DynamicResource TextSecondaryBrush}"
+                                Command="{Binding AddStepCommand}"
+                                CommandParameter="判定 (Decision)" />
+                        <Button Height="26" Margin="0,2,4,2" Padding="8,0" FontSize="10"
+                                Content="🔌 PLC" Style="{StaticResource MaterialDesignFlatButton}"
+                                Foreground="{DynamicResource TextSecondaryBrush}"
+                                Command="{Binding AddStepCommand}"
+                                CommandParameter="PLC 写入 (PLCWrite)" />
+                        <Button Height="26" Margin="0,2,0,2" Padding="8,0" FontSize="10"
+                                Content="☁ MES" Style="{StaticResource MaterialDesignFlatButton}"
+                                Foreground="{DynamicResource TextSecondaryBrush}"
+                                Command="{Binding AddStepCommand}"
+                                CommandParameter="MES 上传 (MESUpload)" />
+                    </WrapPanel>
+
+                    <Separator Grid.Row="2" Margin="0,0,0,6" Background="{DynamicResource CardBorderBrush}" />
+
+                    <!-- 步骤列表 -->
+                    <Grid Grid.Row="3">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+
+                        <StackPanel Grid.Row="0" Margin="0,0,0,6" Orientation="Horizontal">
+                            <TextBlock FontSize="12" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource TextPrimaryBrush}"
+                                       Text="{Binding Steps.Count, StringFormat='步骤 ({0})'}" />
+                            <Button Margin="10,0,4,0" Width="44" Height="18" FontSize="9"
+                                    Command="{Binding ClearStepsCommand}"
+                                    Style="{StaticResource MaterialDesignFlatButton}"
+                                    Foreground="{DynamicResource ErrorBrush}" Content="清空" />
+                            <Button Margin="0,0,4,0" Width="22" Height="18" Padding="0" FontSize="9"
+                                    Command="{Binding MoveUpCommand}"
+                                    Style="{StaticResource MaterialDesignFlatButton}"
+                                    Foreground="{DynamicResource TextMutedBrush}" Content="▲" />
+                            <Button Width="22" Height="18" Padding="0" FontSize="9"
+                                    Command="{Binding MoveDownCommand}"
+                                    Style="{StaticResource MaterialDesignFlatButton}"
+                                    Foreground="{DynamicResource TextMutedBrush}" Content="▼" />
+                        </StackPanel>
+
+                        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+                            <ListBox ItemsSource="{Binding Steps}"
+                                     SelectedItem="{Binding SelectedStep, Mode=TwoWay}"
+                                     Background="Transparent" BorderThickness="0">
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border Margin="0,0,0,4" Padding="8,5"
+                                                Background="{DynamicResource SurfaceDarkBrush}"
+                                                CornerRadius="6" Cursor="Hand">
+                                            <StackPanel>
+                                                <Grid>
+                                                    <TextBlock FontSize="12" FontWeight="SemiBold"
+                                                               Foreground="{DynamicResource TextPrimaryBrush}"
+                                                               Text="{Binding DisplayName}" />
+                                                    <Button HorizontalAlignment="Right" Width="18" Height="18"
+                                                            Padding="0" Background="Transparent" BorderThickness="0"
+                                                            Command="{Binding DataContext.RemoveStepCommand, RelativeSource={RelativeSource AncestorType=ListBox}}"
+                                                            CommandParameter="{Binding}">
+                                                        <TextBlock FontSize="10"
+                                                                   Foreground="{DynamicResource ErrorBrush}" Text="✕" />
+                                                    </Button>
+                                                </Grid>
+                                                <StackPanel Margin="0,4,0,0" Orientation="Horizontal">
+                                                    <TextBlock FontSize="9"
+                                                               Foreground="{DynamicResource TextMutedBrush}" Text="超时:" />
+                                                    <TextBox Width="40" Margin="4,0,8,0" FontSize="9"
+                                                             Foreground="{DynamicResource TextPrimaryBrush}"
+                                                             CaretBrush="{DynamicResource PrimaryBrush}"
+                                                             Text="{Binding TimeoutSeconds}"
+                                                             VerticalContentAlignment="Center" />
+                                                    <TextBlock FontSize="9"
+                                                               Foreground="{DynamicResource TextMutedBrush}" Text="相机:" />
+                                                    <TextBox Width="70" Margin="4,0,8,0" FontSize="9"
+                                                             Foreground="{DynamicResource TextPrimaryBrush}"
+                                                             CaretBrush="{DynamicResource PrimaryBrush}"
+                                                             Text="{Binding CameraName}"
+                                                             VerticalContentAlignment="Center" />
+                                                    <TextBlock FontSize="9"
+                                                               Foreground="{DynamicResource TextMutedBrush}" Text="程序:" />
+                                                    <TextBox Width="90" Margin="4,0,0,0" FontSize="9"
+                                                             Foreground="{DynamicResource TextPrimaryBrush}"
+                                                             CaretBrush="{DynamicResource PrimaryBrush}"
+                                                             Text="{Binding ProgramPath}"
+                                                             VerticalContentAlignment="Center" />
+                                                </StackPanel>
+                                            </StackPanel>
+                                        </Border>
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
+                        </ScrollViewer>
+                    </Grid>
+                </Grid>
+            </Border>
+
+            <!-- 右侧：执行状态 -->
+            <Border Grid.Column="1" Padding="16" Style="{StaticResource CardBorder}">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel>
+
+                        <TextBlock Margin="0,0,0,12" FontSize="13" FontWeight="SemiBold"
+                                   Foreground="{DynamicResource TextPrimaryBrush}" Text="执行状态" />
+
+                        <!-- 进度 -->
+                        <Border Margin="0,0,0,16" Padding="12" Background="{DynamicResource SurfaceDarkBrush}"
+                                CornerRadius="6">
+                            <StackPanel>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <ProgressBar Height="8" Minimum="0" Maximum="100"
+                                                 Value="{Binding Progress}"
+                                                 Foreground="{DynamicResource PrimaryBrush}" />
+                                    <TextBlock Grid.Column="1" Margin="12,0,0,0" FontSize="13" FontWeight="Bold"
+                                               Foreground="{DynamicResource TextAccentBrush}"
+                                               Text="{Binding Progress, StringFormat={}{0:F0}%}" />
+                                </Grid>
+                                <TextBlock Margin="0,6,0,0" FontSize="11"
+                                           Foreground="{DynamicResource TextMutedBrush}"
+                                           Text="{Binding CurrentStepName, TargetNullValue='等待执行...'}" />
+                            </StackPanel>
+                        </Border>
+
+                        <!-- 最终结果 -->
+                        <Border Margin="0,0,0,12" Padding="16" CornerRadius="6">
+                            <Border.Style>
+                                <Style TargetType="Border">
+                                    <Setter Property="Background" Value="{DynamicResource SurfaceDarkBrush}" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding FinalResult}" Value="✓ PASS">
+                                            <Setter Property="Background" Value="{DynamicResource SuccessTintBrush}" />
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding FinalResult}" Value="✗ FAIL">
+                                            <Setter Property="Background" Value="{DynamicResource ErrorTintBrush}" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Border.Style>
+                            <StackPanel>
+                                <TextBlock FontSize="22" FontWeight="Bold" HorizontalAlignment="Center"
+                                           Foreground="{DynamicResource TextPrimaryBrush}"
+                                           Text="{Binding FinalResult, TargetNullValue='—'}" />
+                                <TextBlock Margin="0,4,0,0" FontSize="12" HorizontalAlignment="Center"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"
+                                           Text="{Binding Elapsed, TargetNullValue=''}" />
+                            </StackPanel>
+                        </Border>
+
+                        <!-- 步骤明细 -->
+                        <TextBlock Margin="0,0,0,8" FontSize="13" FontWeight="SemiBold"
+                                   Foreground="{DynamicResource TextPrimaryBrush}" Text="步骤明细" />
+
+                        <ItemsControl ItemsSource="{Binding StepResults}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Margin="0,0,0,3" Padding="8,4"
+                                            Background="{DynamicResource SurfaceDarkBrush}" CornerRadius="4">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="24" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Column="0" VerticalAlignment="Center" FontSize="14"
+                                                       Text="{Binding Success, StringFormat={}}" />
+                                            <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="4,0,0,0">
+                                                <TextBlock FontSize="12" FontWeight="SemiBold"
+                                                           Foreground="{DynamicResource TextPrimaryBrush}"
+                                                           Text="{Binding StepName}" />
+                                                <TextBlock FontSize="10"
+                                                           Foreground="{DynamicResource TextMutedBrush}"
+                                                           Text="{Binding ErrorMessage, TargetNullValue='—'}" />
+                                            </StackPanel>
+                                            <TextBlock Grid.Column="2" VerticalAlignment="Center" FontSize="10"
+                                                       FontFamily="Consolas"
+                                                       Foreground="{DynamicResource TextMutedBrush}"
+                                                       Text="{Binding ElapsedMs, StringFormat={}{0}ms}" />
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+
+                        <Separator Margin="0,12" Background="{DynamicResource CardBorderBrush}" />
+
+                        <!-- 历史记录 -->
+                        <TextBlock Margin="0,0,0,8" FontSize="13" FontWeight="SemiBold"
+                                   Foreground="{DynamicResource TextPrimaryBrush}"
+                                   Text="{Binding History.Count, StringFormat='历史记录 ({0})'}" />
+
+                        <ItemsControl ItemsSource="{Binding History}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Margin="0,0,0,3" Padding="8,4"
+                                            Background="{DynamicResource SurfaceDarkBrush}" CornerRadius="4">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock FontSize="10" FontFamily="Consolas"
+                                                       Foreground="{DynamicResource TextMutedBrush}"
+                                                       Text="{Binding Time, StringFormat={}{0:HH:mm:ss}}" />
+                                            <TextBlock Margin="8,0,0,0" FontSize="11" FontWeight="SemiBold"
+                                                       Text="{Binding Result}">
+                                                <TextBlock.Style>
+                                                    <Style TargetType="TextBlock">
+                                                        <Setter Property="Foreground" Value="{DynamicResource ErrorBrush}" />
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding Result}" Value="PASS">
+                                                                <Setter Property="Foreground" Value="{DynamicResource SuccessBrush}" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </TextBlock.Style>
+                                            </TextBlock>
+                                            <TextBlock Margin="6,0,0,0" FontSize="11"
+                                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                                       Text="{Binding Name}" />
+                                            <TextBlock Margin="4,0,0,0" FontSize="10"
+                                                       Foreground="{DynamicResource TextMutedBrush}"
+                                                       Text="{Binding ElapsedMs, StringFormat={}{0}ms}" />
+                                        </StackPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+
+                    </StackPanel>
+                </ScrollViewer>
+            </Border>
+        </Grid>
+    </Grid>
+</UserControl>

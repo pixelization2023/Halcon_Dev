@@ -1,0 +1,182 @@
+<UserControl
+    x:Class="Inspection.Views.SelfTestView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+    xmlns:prism="http://prismlibrary.com/"
+    prism:ViewModelLocator.AutoWireViewModel="True">
+
+    <StackPanel>
+        <!--  页面头  -->
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <StackPanel>
+                <TextBlock Style="{StaticResource PageTitle}" Text="自检与仿真" />
+                <TextBlock
+                    Margin="0,6,0,0"
+                    Style="{StaticResource MutedText}"
+                    Text="无需相机 / PLC / MES / 数据库即可验证整条检测链路；也可用于现场开机自检" />
+            </StackPanel>
+            <StackPanel
+                Grid.Column="1"
+                VerticalAlignment="Bottom"
+                Orientation="Horizontal">
+                <Button
+                    Margin="0,0,8,0"
+                    Command="{Binding CreateDemoCommand}"
+                    Content="生成演示产品"
+                    Style="{StaticResource ControlButton}" />
+                <Button
+                    Margin="0,0,8,0"
+                    Command="{Binding LoadDemoCommand}"
+                    Content="加载演示产品"
+                    Style="{StaticResource PrimaryButton}" />
+                <Button
+                    Command="{Binding RunCommand}"
+                    Content="运行自检"
+                    Style="{StaticResource SuccessButton}" />
+            </StackPanel>
+        </Grid>
+
+        <!--  仿真投图  -->
+        <Border Margin="0,16,0,0" Style="{StaticResource CardBorder}">
+            <StackPanel>
+                <StackPanel Margin="0,0,0,12" Orientation="Horizontal">
+                    <materialDesign:PackIcon
+                        Width="15"
+                        Height="15"
+                        VerticalAlignment="Center"
+                        Foreground="{DynamicResource PrimaryBrush}"
+                        Kind="CameraPlusOutline" />
+                    <TextBlock
+                        Margin="8,0,0,0"
+                        FontSize="14"
+                        FontWeight="SemiBold"
+                        Foreground="{DynamicResource TextPrimaryBrush}"
+                        Text="仿真投图（无需相机）" />
+                </StackPanel>
+
+                <TextBlock
+                    Style="{StaticResource MutedText}"
+                    Text="投入合成样张后会走真实编排器：Halcon 执行 → PCS 结果梳理 → OK/NG 存图 → 数据上传 → 图表与日志。" />
+
+                <StackPanel Margin="0,12,0,0" Orientation="Horizontal">
+                    <Button
+                        Margin="0,0,8,0"
+                        Command="{Binding SubmitOkCommand}"
+                        Content="投入 OK 样张"
+                        Style="{StaticResource ControlButton}" />
+                    <Button
+                        Command="{Binding SubmitNgCommand}"
+                        Content="投入 NG 样张"
+                        Style="{StaticResource DangerButton}" />
+                    <TextBlock
+                        Margin="16,0,0,0"
+                        VerticalAlignment="Center"
+                        Style="{StaticResource DataValue}"
+                        Text="{Binding ProductText}" />
+                </StackPanel>
+            </StackPanel>
+        </Border>
+
+        <!--  自检结果  -->
+        <Border Margin="0,16,0,0" Style="{StaticResource CardBorder}">
+            <StackPanel>
+                <Grid Margin="0,0,0,12">
+                    <StackPanel Orientation="Horizontal">
+                        <materialDesign:PackIcon
+                            Width="15"
+                            Height="15"
+                            VerticalAlignment="Center"
+                            Foreground="{DynamicResource PrimaryBrush}"
+                            Kind="ClipboardCheckOutline" />
+                        <TextBlock
+                            Margin="8,0,0,0"
+                            FontSize="14"
+                            FontWeight="SemiBold"
+                            Foreground="{DynamicResource TextPrimaryBrush}"
+                            Text="环境自检" />
+                    </StackPanel>
+                    <TextBlock
+                        HorizontalAlignment="Right"
+                        VerticalAlignment="Center"
+                        Style="{StaticResource DataValue}"
+                        Text="{Binding SummaryText}" />
+                </Grid>
+
+                <ItemsControl ItemsSource="{Binding Items}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <!--  整行两段式：第一行=名称/状态/详情，第二行=建议（有建议时才显示）  -->
+                            <StackPanel
+                                Margin="0,7"
+                                ToolTip="{Binding Hint}">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="170" />
+                                        <ColumnDefinition Width="86" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+
+                                    <TextBlock
+                                        Grid.Column="0"
+                                        VerticalAlignment="Center"
+                                        FontSize="13"
+                                        FontWeight="Medium"
+                                        Foreground="{DynamicResource TextPrimaryBrush}"
+                                        Text="{Binding Name}" />
+
+                                    <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                        <Ellipse
+                                            Width="8"
+                                            Height="8"
+                                            Margin="0,0,8,0"
+                                            VerticalAlignment="Center"
+                                            Fill="{Binding Color}" />
+                                        <TextBlock
+                                            VerticalAlignment="Center"
+                                            FontSize="12"
+                                            Foreground="{Binding Color}"
+                                            Text="{Binding StatusText}" />
+                                    </StackPanel>
+
+                                    <TextBlock
+                                        Grid.Column="2"
+                                        VerticalAlignment="Center"
+                                        FontSize="12"
+                                        Foreground="{DynamicResource TextSecondaryBrush}"
+                                        Text="{Binding Detail}"
+                                        TextTrimming="CharacterEllipsis" />
+                                </Grid>
+
+                                <!--  行内建议：不再依赖鼠标悬停  -->
+                                <TextBlock
+                                    Margin="170,3,0,0"
+                                    FontSize="11.5"
+                                    Foreground="{DynamicResource WarningBrush}"
+                                    Text="{Binding HintText}"
+                                    TextWrapping="Wrap"
+                                    Visibility="{Binding HasHint, Converter={StaticResource BoolToVisibility}}" />
+                            </StackPanel>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
+                <Separator Style="{StaticResource ThinSeparator}" />
+                <TextBlock
+                    Style="{StaticResource MutedText}"
+                    Text="说明：异常/未配置项会在行内直接显示处理建议；「未配置」为可选项，无对应硬件时属正常。" />
+            </StackPanel>
+        </Border>
+
+        <TextBlock
+            Margin="0,14,0,0"
+            FontSize="13"
+            Foreground="{DynamicResource PrimaryBrush}"
+            Text="{Binding StatusText}"
+            TextWrapping="Wrap" />
+    </StackPanel>
+</UserControl>

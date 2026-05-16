@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<hdevelop file_version="1.2" halcon_version="25.11.0.0">
+<procedure name="main">
+<interface/>
+<body>
+<c>* CCD 视觉检测系统 - 演示方案（自检 / 仿真用）</c>
+<c>* HALCON 25 的 HDevelop 方案文件是 XML 格式（file_version 1.2）。</c>
+<c>* 接口标签：io=输入图标、ic=输入控制、oo=输出图标、oc=输出控制。</c>
+<c>* 命名约定与项目一致：结果 out{i}、NG 框 box{i}、结果图 image{i}。</c>
+<l>dev_update_off ()</l>
+</body>
+<docu id="main">
+<parameters/>
+</docu>
+</procedure>
+<procedure name="inspect_demo">
+<interface>
+<io>
+<par name="Image" base_type="iconic" dimension="0"/>
+</io>
+<ic>
+<par name="ImageIndex" base_type="ctrl" dimension="0"/>
+</ic>
+<oo>
+<par name="ResultImage" base_type="iconic" dimension="0"/>
+<par name="box0" base_type="iconic" dimension="0"/>
+<par name="box1" base_type="iconic" dimension="0"/>
+</oo>
+<oc>
+<par name="out0" base_type="ctrl" dimension="0"/>
+<par name="out1" base_type="ctrl" dimension="0"/>
+</oc>
+</interface>
+<body>
+<c>* 灰度化（兼容单通道与三通道输入）</c>
+<l>count_channels (Image, Channels)</l>
+<l>if (Channels &gt;= 3)</l>
+<l>    rgb1_to_gray (Image, GrayImage)</l>
+<l>else</l>
+<l>    copy_image (Image, GrayImage)</l>
+<l>endif</l>
+<c>* 检测项 0：是否存在大块亮区（面积 &gt;= 500）</c>
+<l>threshold (GrayImage, Bright, 128, 255)</l>
+<l>connection (Bright, Connected)</l>
+<l>select_shape (Connected, BigDefect, 'area', 'and', 500, 9999999)</l>
+<l>count_obj (BigDefect, DefectCount)</l>
+<l>if (DefectCount &gt; 0)</l>
+<l>    out0 := 'NG'</l>
+<l>    union1 (BigDefect, box0)</l>
+<l>else</l>
+<l>    out0 := 'OK'</l>
+<l>    gen_empty_obj (box0)</l>
+<l>endif</l>
+<c>* 检测项 1：细小亮点数量（面积 20~499）</c>
+<l>select_shape (Connected, SmallSpec, 'area', 'and', 20, 499)</l>
+<l>count_obj (SmallSpec, SpecCount)</l>
+<l>if (SpecCount &gt; 3)</l>
+<l>    out1 := 'NG'</l>
+<l>    union1 (SmallSpec, box1)</l>
+<l>else</l>
+<l>    out1 := 'OK'</l>
+<l>    gen_empty_obj (box1)</l>
+<l>endif</l>
+<c>* 结果图（直接回传原图）</c>
+<l>copy_image (Image, ResultImage)</l>
+</body>
+<docu id="inspect_demo">
+<parameters/>
+</docu>
+</procedure>
+<procedure name="scan_code">
+<interface>
+<io>
+<par name="Image" base_type="iconic" dimension="0"/>
+</io>
+<oc>
+<par name="code" base_type="ctrl" dimension="0"/>
+</oc>
+</interface>
+<body>
+<c>* 演示实现：按图像尺寸生成一个固定条码字符串</c>
+<c>* 真实现场请替换为 create_bar_code_model + find_bar_code</c>
+<l>count_channels (Image, Channels)</l>
+<l>if (Channels &gt;= 3)</l>
+<l>    rgb1_to_gray (Image, GrayImage)</l>
+<l>else</l>
+<l>    copy_image (Image, GrayImage)</l>
+<l>endif</l>
+<l>get_image_size (GrayImage, Width, Height)</l>
+<l>code := 'DEMO-' + Width$'d' + 'X' + Height$'d' + '-0000000001'</l>
+</body>
+<docu id="scan_code">
+<parameters/>
+</docu>
+</procedure>
+</hdevelop>

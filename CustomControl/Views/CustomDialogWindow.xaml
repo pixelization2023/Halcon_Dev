@@ -1,0 +1,39 @@
+<Window
+    x:Class="CustomControl.CustomDialogWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:local="clr-namespace:CustomControl"
+    xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    Title="CustomDialogWindow"
+    Width="800"
+    Height="450"
+    MinWidth="400"
+    MinHeight="200"
+    AllowsTransparency="True"
+    Background="Transparent"
+    ResizeMode="NoResize"
+    SizeToContent="WidthAndHeight"
+    WindowStyle="None"
+    WindowStartupLocation="CenterScreen"
+    mc:Ignorable="d">
+    <Window.Resources>
+        <!--  默认样式继承 MaterialDesign 主题  -->
+        <Style BasedOn="{StaticResource MaterialDesignFlatButton}" TargetType="Button" />
+    </Window.Resources>
+    <!--  外层半透明遮罩背景（可选，用于模态效果）  -->
+    <Border Background="{DynamicResource ScrimBrush}">
+        <!--  卡片式内容容器  -->
+        <materialDesign:Card
+            Margin="15"
+            Background="{DynamicResource MaterialDesignPaper}"
+            Effect="{StaticResource MaterialDesignShadowDepth4}"
+            UniformCornerRadius="8">
+
+            <!--  内容呈现区域  -->
+            <ContentPresenter x:Name="DialogContentPresenter" />
+
+        </materialDesign:Card>
+    </Border>
+</Window>

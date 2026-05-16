@@ -1,0 +1,546 @@
+<UserControl
+    x:Class="Inspection.Views.DashboardView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:halcon="clr-namespace:HalconView;assembly=HalconView"
+    xmlns:lvc="clr-namespace:LiveChartsCore.SkiaSharpView.WPF;assembly=LiveChartsCore.SkiaSharpView.WPF"
+    xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+    xmlns:prism="http://prismlibrary.com/"
+    prism:ViewModelLocator.AutoWireViewModel="True">
+
+    <StackPanel>
+
+        <!--  ============ 页面头：标题 + 上下文 + 动作 ============  -->
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <StackPanel>
+                <TextBlock Style="{StaticResource PageTitle}" Text="检测主监控台" />
+                <StackPanel Margin="0,6,0,0" Orientation="Horizontal">
+                    <TextBlock Style="{StaticResource MutedText}" Text="产品" />
+                    <TextBlock
+                        Margin="6,0,16,0"
+                        FontSize="12.5"
+                        FontWeight="Medium"
+                        Foreground="{DynamicResource TextSecondaryBrush}"
+                        Text="{Binding ProductName}" />
+                    <TextBlock Style="{StaticResource MutedText}" Text="方案" />
+                    <TextBlock
+                        Margin="6,0,16,0"
+                        FontSize="12.5"
+                        FontWeight="Medium"
+                        Foreground="{DynamicResource TextSecondaryBrush}"
+                        Text="{Binding SolutionName}" />
+                    <TextBlock Style="{StaticResource MutedText}" Text="操作员" />
+                    <TextBlock
+                        Margin="6,0,0,0"
+                        FontSize="12.5"
+                        FontWeight="Medium"
+                        Foreground="{DynamicResource TextSecondaryBrush}"
+                        Text="{Binding CurrentUserText}" />
+                </StackPanel>
+            </StackPanel>
+
+            <StackPanel
+                Grid.Column="1"
+                VerticalAlignment="Top"
+                Orientation="Horizontal">
+                <Border Style="{StaticResource StatusChip}" Margin="0,0,10,0">
+                    <StackPanel Orientation="Horizontal">
+                        <Ellipse Style="{StaticResource StatusDot}" Fill="{DynamicResource SuccessBrush}" />
+                        <TextBlock
+                            FontSize="11.5"
+                            Foreground="{DynamicResource TextSecondaryBrush}"
+                            Text="{Binding Elapsed}" />
+                    </StackPanel>
+                </Border>
+                <Button
+                    Command="{Binding StartCommand}"
+                    Content="开始运行"
+                    Style="{StaticResource SuccessButton}" />
+                <Button
+                    Margin="8,0,0,0"
+                    Command="{Binding StopCommand}"
+                    Content="停止"
+                    Style="{StaticResource DangerButton}" />
+                <Button
+                    Margin="8,0,0,0"
+                    Command="{Binding ClearCommand}"
+                    Content="清除数据"
+                    Style="{StaticResource ControlButton}" />
+                <Button
+                    Margin="8,0,0,0"
+                    Command="{Binding TriggerCameraCommand}"
+                    Content="软触发"
+                    Style="{StaticResource PrimaryButton}" />
+                <Button
+                    Margin="8,0,0,0"
+                    Command="{Binding InitializeBoardCommand}"
+                    Content="初始化出板"
+                    Style="{StaticResource ControlButton}" />
+            </StackPanel>
+        </Grid>
+
+        <!--  ============ 指标卡行 ============  -->
+        <UniformGrid Margin="0,18,0,0" Columns="4" Rows="1">
+            <!--  渐变主卡：图片进度  -->
+            <Border Margin="0,0,14,0" Style="{StaticResource MetricCardGradient}">
+                <StackPanel>
+                    <StackPanel Orientation="Horizontal">
+                        <materialDesign:PackIcon
+                            Width="16"
+                            Height="16"
+                            VerticalAlignment="Center"
+                            Foreground="{DynamicResource TextOnAccentBrush}"
+                            Kind="ImageMultipleOutline" />
+                        <TextBlock
+                            Margin="8,0,0,0"
+                            FontSize="12"
+                            Foreground="{DynamicResource TextOnAccentBrush}"
+                            Opacity="0.9"
+                            Text="图片进度" />
+                    </StackPanel>
+                    <StackPanel Margin="0,8,0,0" Orientation="Horizontal">
+                        <TextBlock
+                            FontSize="30"
+                            FontWeight="Bold"
+                            Foreground="{DynamicResource TextOnAccentBrush}"
+                            Text="{Binding ProcessedImages, Mode=OneWay}" />
+                        <TextBlock
+                            Margin="4,0,0,0"
+                            VerticalAlignment="Bottom"
+                            FontSize="14"
+                            Foreground="{DynamicResource TextOnAccentBrush}"
+                            Opacity="0.85"
+                            Text="{Binding ImageTotal, StringFormat=' / {0}', Mode=OneWay}" />
+                    </StackPanel>
+                    <ProgressBar
+                        Margin="0,10,0,0"
+                        Background="#33FFFFFF"
+                        Foreground="White"
+                        Maximum="1"
+                        Style="{StaticResource ThinProgressBar}"
+                        Value="{Binding Progress, Mode=OneWay}" />
+                </StackPanel>
+            </Border>
+
+            <!--  OK  -->
+            <Border Margin="0,0,14,0" Style="{StaticResource MetricCard}">
+                <StackPanel>
+                    <StackPanel Orientation="Horizontal">
+                        <materialDesign:PackIcon
+                            Width="16"
+                            Height="16"
+                            VerticalAlignment="Center"
+                            Foreground="{DynamicResource SuccessBrush}"
+                            Kind="CheckCircleOutline" />
+                        <TextBlock
+                            Margin="8,0,0,0"
+                            FontSize="12"
+                            Foreground="{DynamicResource TextMutedBrush}"
+                            Text="OK 数" />
+                    </StackPanel>
+                    <TextBlock
+                        Margin="0,8,0,0"
+                        FontSize="30"
+                        FontWeight="Bold"
+                        Foreground="{DynamicResource SuccessBrush}"
+                        Text="{Binding OkCount, Mode=OneWay}" />
+                </StackPanel>
+            </Border>
+
+            <!--  NG  -->
+            <Border Margin="0,0,14,0" Style="{StaticResource MetricCard}">
+                <StackPanel>
+                    <StackPanel Orientation="Horizontal">
+                        <materialDesign:PackIcon
+                            Width="16"
+                            Height="16"
+                            VerticalAlignment="Center"
+                            Foreground="{DynamicResource ErrorBrush}"
+                            Kind="AlertCircleOutline" />
+                        <TextBlock
+                            Margin="8,0,0,0"
+                            FontSize="12"
+                            Foreground="{DynamicResource TextMutedBrush}"
+                            Text="NG 数" />
+                    </StackPanel>
+                    <TextBlock
+                        Margin="0,8,0,0"
+                        FontSize="30"
+                        FontWeight="Bold"
+                        Foreground="{DynamicResource ErrorBrush}"
+                        Text="{Binding NgCount, Mode=OneWay}" />
+                </StackPanel>
+            </Border>
+
+            <!--  耗时  -->
+            <Border Style="{StaticResource MetricCard}">
+                <StackPanel>
+                    <StackPanel Orientation="Horizontal">
+                        <materialDesign:PackIcon
+                            Width="16"
+                            Height="16"
+                            VerticalAlignment="Center"
+                            Foreground="{DynamicResource PrimaryBrush}"
+                            Kind="TimerSand" />
+                        <TextBlock
+                            Margin="8,0,0,0"
+                            FontSize="12"
+                            Foreground="{DynamicResource TextMutedBrush}"
+                            Text="耗时" />
+                    </StackPanel>
+                    <StackPanel Margin="0,10,0,0">
+                        <Grid>
+                            <TextBlock Style="{StaticResource DataLabel}" Text="视觉" />
+                            <TextBlock HorizontalAlignment="Right" Style="{StaticResource DataValue}" Text="{Binding VisionElapsed}" />
+                        </Grid>
+                        <Grid Margin="0,6,0,0">
+                            <TextBlock Style="{StaticResource DataLabel}" Text="上传" />
+                            <TextBlock HorizontalAlignment="Right" Style="{StaticResource DataValue}" Text="{Binding UploadElapsed}" />
+                        </Grid>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </UniformGrid>
+
+        <!--  ============ 图像 + 右栏 ============  -->
+        <Grid Margin="0,16,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="2.1*" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <Border
+                Grid.Column="0"
+                Margin="0,0,16,0"
+                Style="{StaticResource CardBorder}">
+                <StackPanel>
+                    <Grid Margin="0,0,0,12">
+                        <StackPanel Orientation="Horizontal">
+                            <materialDesign:PackIcon
+                                Width="15"
+                                Height="15"
+                                VerticalAlignment="Center"
+                                Foreground="{DynamicResource PrimaryBrush}"
+                                Kind="ImageOutline" />
+                            <TextBlock
+                                Margin="8,0,0,0"
+                                FontSize="14"
+                                FontWeight="SemiBold"
+                                Foreground="{DynamicResource TextPrimaryBrush}"
+                                Text="实时图像" />
+                        </StackPanel>
+                        <TextBlock
+                            HorizontalAlignment="Right"
+                            VerticalAlignment="Center"
+                            Style="{StaticResource MutedText}"
+                            Text="{Binding LaserCode}" />
+                    </Grid>
+
+                    <halcon:HalconView Height="380" HImage="{Binding CurrentImage}" />
+                </StackPanel>
+            </Border>
+
+            <StackPanel Grid.Column="1">
+                <!--  良率环形图（参考 Radiograph 的百分比环）  -->
+                <Border Margin="0,0,0,14" Style="{StaticResource CardBorder}">
+                    <StackPanel>
+                        <StackPanel Margin="0,0,0,10" Orientation="Horizontal">
+                            <materialDesign:PackIcon
+                                Width="15"
+                                Height="15"
+                                VerticalAlignment="Center"
+                                Foreground="{DynamicResource PrimaryBrush}"
+                                Kind="ChartDonut" />
+                            <TextBlock
+                                Margin="8,0,0,0"
+                                FontSize="14"
+                                FontWeight="SemiBold"
+                                Foreground="{DynamicResource TextPrimaryBrush}"
+                                Text="良率" />
+                        </StackPanel>
+
+                        <Grid Height="140">
+                            <lvc:PieChart
+                                InitialRotation="-90"
+                                LegendPosition="Hidden"
+                                Series="{Binding YieldSeries}"
+                                TooltipPosition="Hidden" />
+                            <StackPanel
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center">
+                                <TextBlock
+                                    HorizontalAlignment="Center"
+                                    FontSize="22"
+                                    FontWeight="Bold"
+                                    Foreground="{DynamicResource TextPrimaryBrush}"
+                                    Text="{Binding YieldText}" />
+                                <TextBlock
+                                    Margin="0,2,0,0"
+                                    HorizontalAlignment="Center"
+                                    Style="{StaticResource MutedText}"
+                                    Text="{Binding ProcessedPcs, StringFormat={}{0} PCS}" />
+                            </StackPanel>
+                        </Grid>
+
+                        <Grid Margin="0,10,0,0">
+                            <StackPanel Orientation="Horizontal">
+                                <Ellipse Style="{StaticResource StatusDot}" Fill="{DynamicResource SuccessBrush}" />
+                                <TextBlock Style="{StaticResource DataLabel}" Text="{Binding OkCount, StringFormat=OK {0}}" />
+                            </StackPanel>
+                            <StackPanel HorizontalAlignment="Right" Orientation="Horizontal">
+                                <Ellipse Style="{StaticResource StatusDot}" Fill="{DynamicResource ErrorBrush}" />
+                                <TextBlock Style="{StaticResource DataLabel}" Text="{Binding NgCount, StringFormat=NG {0}}" />
+                            </StackPanel>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <!--  设备状态（数据行：状态点 + 文本）  -->
+                <Border Style="{StaticResource CardBorder}">
+                    <StackPanel>
+                        <StackPanel Margin="0,0,0,12" Orientation="Horizontal">
+                            <materialDesign:PackIcon
+                                Width="15"
+                                Height="15"
+                                VerticalAlignment="Center"
+                                Foreground="{DynamicResource PrimaryBrush}"
+                                Kind="LanConnect" />
+                            <TextBlock
+                                Margin="8,0,0,0"
+                                FontSize="14"
+                                FontWeight="SemiBold"
+                                Foreground="{DynamicResource TextPrimaryBrush}"
+                                Text="设备状态" />
+                        </StackPanel>
+                        <ItemsControl ItemsSource="{Binding Indicators}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid Margin="0,5">
+                                        <StackPanel Orientation="Horizontal">
+                                            <Ellipse
+                                                Width="8"
+                                                Height="8"
+                                                Margin="0,0,10,0"
+                                                VerticalAlignment="Center"
+                                                Fill="{Binding Color}" />
+                                            <TextBlock
+                                                FontSize="12.5"
+                                                Foreground="{DynamicResource TextSecondaryBrush}"
+                                                Text="{Binding Name}" />
+                                        </StackPanel>
+                                        <TextBlock
+                                            HorizontalAlignment="Right"
+                                            FontSize="12.5"
+                                            FontWeight="Medium"
+                                            Foreground="{Binding Color}"
+                                            Text="{Binding Text}" />
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </Border>
+
+                <!--  制品信息（左标签 / 右数值）  -->
+                <Border Margin="0,14,0,0" Style="{StaticResource CardBorder}">
+                    <StackPanel>
+                        <StackPanel Margin="0,0,0,12" Orientation="Horizontal">
+                            <materialDesign:PackIcon
+                                Width="15"
+                                Height="15"
+                                VerticalAlignment="Center"
+                                Foreground="{DynamicResource PrimaryBrush}"
+                                Kind="BarcodeScan" />
+                            <TextBlock
+                                Margin="8,0,0,0"
+                                FontSize="14"
+                                FontWeight="SemiBold"
+                                Foreground="{DynamicResource TextPrimaryBrush}"
+                                Text="制品信息" />
+                        </StackPanel>
+
+                        <Grid Margin="0,5">
+                            <TextBlock Style="{StaticResource DataLabel}" Text="LOT 号" />
+                            <TextBlock HorizontalAlignment="Right" Style="{StaticResource DataValue}" Text="{Binding LotNo}" />
+                        </Grid>
+                        <Grid Margin="0,5">
+                            <TextBlock Style="{StaticResource DataLabel}" Text="机种" />
+                            <TextBlock HorizontalAlignment="Right" Style="{StaticResource DataValue}" Text="{Binding ProductModel}" />
+                        </Grid>
+                        <Grid Margin="0,5">
+                            <TextBlock Style="{StaticResource DataLabel}" Text="镭射码" />
+                            <TextBlock HorizontalAlignment="Right" Style="{StaticResource DataValue}" Text="{Binding LaserCode}" />
+                        </Grid>
+                        <Grid Margin="0,5">
+                            <TextBlock Style="{StaticResource DataLabel}" Text="纸质码" />
+                            <TextBlock HorizontalAlignment="Right" Style="{StaticResource DataValue}" Text="{Binding PaperCode}" />
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <!--  检测项目  -->
+                <Border Margin="0,14,0,0" Style="{StaticResource CardBorder}">
+                    <StackPanel>
+                        <StackPanel Margin="0,0,0,12" Orientation="Horizontal">
+                            <materialDesign:PackIcon
+                                Width="15"
+                                Height="15"
+                                VerticalAlignment="Center"
+                                Foreground="{DynamicResource PrimaryBrush}"
+                                Kind="FormatListChecks" />
+                            <TextBlock
+                                Margin="8,0,0,0"
+                                FontSize="14"
+                                FontWeight="SemiBold"
+                                Foreground="{DynamicResource TextPrimaryBrush}"
+                                Text="检测项目" />
+                        </StackPanel>
+                        <ItemsControl ItemsSource="{Binding DetectionItems}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <TextBlock
+                                        Margin="0,3"
+                                        FontSize="12.5"
+                                        Foreground="{DynamicResource TextSecondaryBrush}"
+                                        Text="{Binding}" />
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </Grid>
+
+        <!--  ============ 检测耗时趋势（LiveCharts 折线） ============  -->
+        <Border Margin="0,16,0,0" Style="{StaticResource CardBorder}">
+            <StackPanel>
+                <Grid Margin="0,0,0,10">
+                    <StackPanel Orientation="Horizontal">
+                        <materialDesign:PackIcon
+                            Width="15"
+                            Height="15"
+                            VerticalAlignment="Center"
+                            Foreground="{DynamicResource PrimaryBrush}"
+                            Kind="ChartLine" />
+                        <TextBlock
+                            Margin="8,0,0,0"
+                            FontSize="14"
+                            FontWeight="SemiBold"
+                            Foreground="{DynamicResource TextPrimaryBrush}"
+                            Text="检测耗时趋势" />
+                    </StackPanel>
+                    <TextBlock
+                        HorizontalAlignment="Right"
+                        VerticalAlignment="Center"
+                        Style="{StaticResource MutedText}"
+                        Text="单位 ms · 最近 60 个 PCS" />
+                </Grid>
+
+                <lvc:CartesianChart
+                    Height="130"
+                    LegendPosition="Hidden"
+                    Series="{Binding TrendSeries}"
+                    TooltipPosition="Hidden"
+                    XAxes="{Binding HiddenXAxes}"
+                    YAxes="{Binding HiddenYAxes}" />
+            </StackPanel>
+        </Border>
+
+        <!--  ============ 结果表 + 实时日志 ============  -->
+        <Grid Margin="0,16,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="2.1*" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <Border
+                Grid.Column="0"
+                Margin="0,0,16,0"
+                Style="{StaticResource CardBorder}">
+                <StackPanel>
+                    <StackPanel Margin="0,0,0,10" Orientation="Horizontal">
+                        <materialDesign:PackIcon
+                            Width="15"
+                            Height="15"
+                            VerticalAlignment="Center"
+                            Foreground="{DynamicResource PrimaryBrush}"
+                            Kind="TableLarge" />
+                        <TextBlock
+                            Margin="8,0,0,0"
+                            FontSize="14"
+                            FontWeight="SemiBold"
+                            Foreground="{DynamicResource TextPrimaryBrush}"
+                            Text="PCS 检测结果" />
+                    </StackPanel>
+
+                    <!--  纯展示表格：IsReadOnly 避免单元格用 TwoWay 写只读属性  -->
+                    <DataGrid
+                        AutoGenerateColumns="False"
+                        CanUserAddRows="False"
+                        CanUserDeleteRows="False"
+                        IsReadOnly="True"
+                        ItemsSource="{Binding PcsResults}"
+                        MaxHeight="240">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Binding="{Binding PcsIndex, Mode=OneWay}" Header="PCS" Width="70" />
+                            <DataGridTextColumn Binding="{Binding Judgment, Mode=OneWay}" Header="判定" Width="80" />
+                            <DataGridTextColumn Binding="{Binding ResultText, Mode=OneWay}" Header="结果串" Width="150" />
+                            <DataGridTextColumn Binding="{Binding PaperCode, Mode=OneWay}" Header="纸质码" Width="150" />
+                            <DataGridTextColumn Binding="{Binding LaserCode, Mode=OneWay}" Header="镭射码" Width="180" />
+                            <DataGridTextColumn Binding="{Binding PhotoName, Mode=OneWay}" Header="存图" Width="*" />
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </StackPanel>
+            </Border>
+
+            <Border Grid.Column="1" Style="{StaticResource CardBorder}">
+                <StackPanel>
+                    <Grid Margin="0,0,0,10">
+                        <StackPanel Orientation="Horizontal">
+                            <materialDesign:PackIcon
+                                Width="15"
+                                Height="15"
+                                VerticalAlignment="Center"
+                                Foreground="{DynamicResource PrimaryBrush}"
+                                Kind="ConsoleLine" />
+                            <TextBlock
+                                Margin="8,0,0,0"
+                                FontSize="14"
+                                FontWeight="SemiBold"
+                                Foreground="{DynamicResource TextPrimaryBrush}"
+                                Text="实时日志" />
+                        </StackPanel>
+                        <Button
+                            HorizontalAlignment="Right"
+                            Command="{Binding ClearEventsCommand}"
+                            Content="清空"
+                            Style="{StaticResource ControlButton}"
+                            Height="28"
+                            MinWidth="60"
+                            FontSize="11" />
+                    </Grid>
+
+                    <Border
+                        MaxHeight="240"
+                        Background="{DynamicResource SurfaceDarkBrush}"
+                        CornerRadius="10">
+                        <ListBox
+                            Padding="8,4"
+                            Background="Transparent"
+                            BorderThickness="0"
+                            FontFamily="Consolas"
+                            FontSize="11.5"
+                            Foreground="{DynamicResource TextSecondaryBrush}"
+                            ItemsSource="{Binding Events}"
+                            ScrollViewer.HorizontalScrollBarVisibility="Disabled" />
+                    </Border>
+                </StackPanel>
+            </Border>
+        </Grid>
+    </StackPanel>
+</UserControl>

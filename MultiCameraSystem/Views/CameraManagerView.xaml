@@ -1,0 +1,91 @@
+<UserControl
+    x:Class="MultiCameraSystem.Views.CameraManagerView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+    xmlns:i="http://schemas.microsoft.com/xaml/behaviors"
+    xmlns:prism="http://prismlibrary.com/"
+    prism:ViewModelLocator.AutoWireViewModel="True"
+    Background="Transparent">
+
+    <i:Interaction.Triggers>
+        <i:EventTrigger EventName="Loaded">
+            <prism:InvokeCommandAction Command="{Binding LoadedCommand}" />
+        </i:EventTrigger>
+    </i:Interaction.Triggers>
+    <DockPanel>
+        <!--  页面头  -->
+        <StackPanel
+            DockPanel.Dock="Top"
+            Margin="0,0,0,16">
+            <TextBlock Style="{StaticResource PageTitle}" Text="相机管理" />
+            <TextBlock
+                Margin="0,6,0,0"
+                Style="{StaticResource MutedText}"
+                Text="选择设备后可进行连接、参数设置与采图测试" />
+        </StackPanel>
+
+        <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="380" />
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+
+        <!--  左侧：相机列表  -->
+        <Border
+            Grid.Column="0"
+            Padding="16"
+            CornerRadius="10"
+            Style="{StaticResource CardBorder}">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+
+                <StackPanel
+                    Grid.Row="0"
+                    Margin="0,0,0,12"
+                    Orientation="Horizontal">
+                    <materialDesign:PackIcon
+                        Width="18"
+                        Height="18"
+                        VerticalAlignment="Center"
+                        Foreground="{DynamicResource PrimaryBrush}"
+                        Kind="Camera" />
+                    <TextBlock
+                        Margin="8,0,0,0"
+                        Style="{StaticResource SectionTitle}"
+                        Text="相机列表" />
+                </StackPanel>
+
+                <Separator
+                    Grid.Row="1"
+                    Margin="0,0,0,12"
+                    Background="{DynamicResource CardBorderBrush}" />
+
+                <ContentControl Grid.Row="2" prism:RegionManager.RegionName="CameraListRegion" />
+            </Grid>
+        </Border>
+
+        <!--  分割线  -->
+        <GridSplitter
+            Grid.Column="1"
+            Width="4"
+            HorizontalAlignment="Center"
+            VerticalAlignment="Stretch"
+            Background="Transparent" />
+
+        <!--  右侧：相机控制面板  -->
+        <Border
+            Grid.Column="2"
+            Padding="16"
+            CornerRadius="10"
+            Style="{StaticResource CardBorder}">
+            <ContentControl prism:RegionManager.RegionName="CameraMainRegion" />
+        </Border>
+        </Grid>
+    </DockPanel>
+</UserControl>

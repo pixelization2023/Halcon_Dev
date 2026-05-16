@@ -1,0 +1,750 @@
+<UserControl
+    x:Class="Inspection.Views.SystemSettingsView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+    xmlns:prism="http://prismlibrary.com/"
+    prism:ViewModelLocator.AutoWireViewModel="True">
+
+    <StackPanel>
+        <TextBlock Style="{StaticResource PageTitle}" Text="系统设置" />
+        <TextBlock Style="{StaticResource MutedText}" Text="迁移自原 WinForms 设置窗体：通用设置 / 存图设置 / 视觉设置 / MES设置 / 通讯设置 / 数据库设置。操作员仅可编辑通用、MES、存图三项。" />
+
+        <TabControl
+            Margin="0,16,0,0"
+            Background="Transparent"
+            BorderBrush="{DynamicResource CardBorderBrush}">
+
+            <!--  ============ 通用设置 ============  -->
+            <TabItem Header="通用设置">
+                <Border Style="{StaticResource CardBorder}">
+                    <WrapPanel Orientation="Horizontal">
+                        <CheckBox
+                            Margin="0,6,28,6"
+                            Content="重复过站检查"
+                            IsChecked="{Binding GeneralToggles.Repeat}"
+                            IsEnabled="{Binding CanEditGeneral}" />
+                        <CheckBox
+                            Margin="0,6,28,6"
+                            Content="工序数据上传"
+                            IsChecked="{Binding GeneralToggles.MesProcess}"
+                            IsEnabled="{Binding CanEditGeneral}" />
+                        <CheckBox
+                            Margin="0,6,28,6"
+                            Content="检测数据上传"
+                            IsChecked="{Binding GeneralToggles.MesData}"
+                            IsEnabled="{Binding CanEditGeneral}" />
+                        <CheckBox
+                            Margin="0,6,28,6"
+                            Content="统计良率上传"
+                            IsChecked="{Binding GeneralToggles.MesYield}"
+                            IsEnabled="{Binding CanEditGeneral}" />
+                        <CheckBox
+                            Margin="0,6,28,6"
+                            Content="日报上传"
+                            IsChecked="{Binding GeneralToggles.MesDaily}"
+                            IsEnabled="{Binding CanEditGeneral}" />
+                        <CheckBox
+                            Margin="0,6,28,6"
+                            Content="样品板上传"
+                            IsChecked="{Binding GeneralToggles.MesSample}"
+                            IsEnabled="{Binding CanEditGeneral}" />
+                        <CheckBox
+                            Margin="0,6,28,6"
+                            Content="条码发送复判"
+                            IsChecked="{Binding GeneralToggles.ChooseDataUploadsCheck}"
+                            IsEnabled="{Binding CanEditGeneral}" />
+                        <CheckBox
+                            Margin="0,6,28,6"
+                            Content="MES 自动更新"
+                            IsChecked="{Binding GeneralToggles.ChooseOpenUpdateMes}"
+                            IsEnabled="{Binding CanEditGeneral}" />
+                        <CheckBox
+                            Margin="0,6,28,6"
+                            Content="扫码通讯使能"
+                            IsChecked="{Binding GeneralToggles.OpenCoderComm}"
+                            IsEnabled="{Binding CanEditGeneral}" />
+                        <CheckBox
+                            Margin="0,6,28,6"
+                            Content="数据库上传"
+                            IsChecked="{Binding GeneralToggles.Upload}"
+                            IsEnabled="{Binding CanEditGeneral}" />
+                        <CheckBox
+                            Margin="0,6,28,6"
+                            Content="流道模式"
+                            IsChecked="{Binding GeneralToggles.Runners}"
+                            IsEnabled="{Binding CanEditGeneral}" />
+                        <CheckBox
+                            Margin="0,6,28,6"
+                            Content="单张模式"
+                            IsChecked="{Binding GeneralToggles.Leaflets}"
+                            IsEnabled="{Binding CanEditGeneral}" />
+                        <CheckBox
+                            Margin="0,6,28,6"
+                            Content="整张 PCS 一起上传"
+                            IsChecked="{Binding VisionToggles.WholePcs}"
+                            IsEnabled="{Binding CanEditGeneral}" />
+                        <CheckBox
+                            Margin="0,6,28,6"
+                            Content="单 PCS 即时上传"
+                            IsChecked="{Binding VisionToggles.SinglePcs}"
+                            IsEnabled="{Binding CanEditGeneral}" />
+                        <CheckBox
+                            Margin="0,6,28,6"
+                            Content="单流程模式"
+                            IsChecked="{Binding VisionToggles.Single}"
+                            IsEnabled="{Binding CanEditGeneral}" />
+                        <CheckBox
+                            Margin="0,6,28,6"
+                            Content="多流程模式"
+                            IsChecked="{Binding VisionToggles.Many}"
+                            IsEnabled="{Binding CanEditGeneral}" />
+                        <CheckBox
+                            Margin="0,6,28,6"
+                            Content="单码单 PCS"
+                            IsChecked="{Binding VisionToggles.OneImageOneCode}"
+                            IsEnabled="{Binding CanEditGeneral}" />
+                        <CheckBox
+                            Margin="0,6,28,6"
+                            Content="多码多 PCS"
+                            IsChecked="{Binding VisionToggles.ManyImageOneCode}"
+                            IsEnabled="{Binding CanEditGeneral}" />
+                        <CheckBox
+                            Margin="0,6,28,6"
+                            Content="使用镭射码获取 LOT"
+                            IsChecked="{Binding VisionToggles.ProcessAcquisition}"
+                            IsEnabled="{Binding CanEditGeneral}" />
+                    </WrapPanel>
+                </Border>
+            </TabItem>
+
+            <!--  ============ 存图设置 ============  -->
+            <TabItem Header="存图设置">
+                <Border Style="{StaticResource CardBorder}">
+                    <StackPanel>
+                        <WrapPanel>
+                            <CheckBox
+                                Margin="0,6,28,6"
+                                Content="保存原始图"
+                                IsChecked="{Binding ImageToggles.OriginalImage}"
+                                IsEnabled="{Binding CanEditImageSave}" />
+                            <CheckBox
+                                Margin="0,6,28,6"
+                                Content="保存 NG 图"
+                                IsChecked="{Binding ImageToggles.NgImage}"
+                                IsEnabled="{Binding CanEditImageSave}" />
+                            <CheckBox
+                                Margin="0,6,28,6"
+                                Content="保存复判图"
+                                IsChecked="{Binding ImageToggles.ReCheckImage}"
+                                IsEnabled="{Binding CanEditImageSave}" />
+                        </WrapPanel>
+
+                        <Grid Margin="0,12,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="150" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+
+                            <TextBlock
+                                Grid.Row="0"
+                                Grid.Column="0"
+                                VerticalAlignment="Center"
+                                Style="{StaticResource MutedText}"
+                                Text="原始图目录" />
+                            <TextBox
+                                Grid.Row="0"
+                                Grid.Column="1"
+                                Margin="0,4"
+                                Style="{StaticResource DarkTextBox}"
+                                Text="{Binding ImageLocation.OriginalPath, UpdateSourceTrigger=PropertyChanged}" />
+                            <Button
+                                Grid.Row="0"
+                                Grid.Column="2"
+                                Margin="8,4,0,4"
+                                Command="{Binding BrowseOriginalCommand}"
+                                Content="浏览"
+                                Style="{StaticResource ControlButton}" />
+
+                            <TextBlock
+                                Grid.Row="1"
+                                Grid.Column="0"
+                                VerticalAlignment="Center"
+                                Style="{StaticResource MutedText}"
+                                Text="NG 图目录" />
+                            <TextBox
+                                Grid.Row="1"
+                                Grid.Column="1"
+                                Margin="0,4"
+                                Style="{StaticResource DarkTextBox}"
+                                Text="{Binding ImageLocation.NgPath, UpdateSourceTrigger=PropertyChanged}" />
+                            <Button
+                                Grid.Row="1"
+                                Grid.Column="2"
+                                Margin="8,4,0,4"
+                                Command="{Binding BrowseNgCommand}"
+                                Content="浏览"
+                                Style="{StaticResource ControlButton}" />
+
+                            <TextBlock
+                                Grid.Row="2"
+                                Grid.Column="0"
+                                VerticalAlignment="Center"
+                                Style="{StaticResource MutedText}"
+                                Text="OK 图目录" />
+                            <TextBox
+                                Grid.Row="2"
+                                Grid.Column="1"
+                                Margin="0,4"
+                                Style="{StaticResource DarkTextBox}"
+                                Text="{Binding ImageLocation.OkPath, UpdateSourceTrigger=PropertyChanged}" />
+                            <Button
+                                Grid.Row="2"
+                                Grid.Column="2"
+                                Margin="8,4,0,4"
+                                Command="{Binding BrowseOkCommand}"
+                                Content="浏览"
+                                Style="{StaticResource ControlButton}" />
+
+                            <TextBlock
+                                Grid.Row="3"
+                                Grid.Column="0"
+                                VerticalAlignment="Center"
+                                Style="{StaticResource MutedText}"
+                                Text="复判图目录" />
+                            <TextBox
+                                Grid.Row="3"
+                                Grid.Column="1"
+                                Margin="0,4"
+                                Style="{StaticResource DarkTextBox}"
+                                Text="{Binding ImageLocation.ReCheckPath, UpdateSourceTrigger=PropertyChanged}" />
+                            <Button
+                                Grid.Row="3"
+                                Grid.Column="2"
+                                Margin="8,4,0,4"
+                                Command="{Binding BrowseReCheckCommand}"
+                                Content="浏览"
+                                Style="{StaticResource ControlButton}" />
+
+                            <TextBlock
+                                Grid.Row="4"
+                                Grid.Column="0"
+                                VerticalAlignment="Center"
+                                Style="{StaticResource MutedText}"
+                                Text="JPEG 压缩质量" />
+                            <TextBox
+                                Grid.Row="4"
+                                Grid.Column="1"
+                                Margin="0,4"
+                                Style="{StaticResource DarkTextBox}"
+                                Text="{Binding ImageLocation.ImageZipPercent, UpdateSourceTrigger=PropertyChanged}" />
+
+                            <TextBlock
+                                Grid.Row="5"
+                                Grid.Column="0"
+                                VerticalAlignment="Center"
+                                Style="{StaticResource MutedText}"
+                                Text="原始图保留天数" />
+                            <TextBox
+                                Grid.Row="5"
+                                Grid.Column="1"
+                                Margin="0,4"
+                                Style="{StaticResource DarkTextBox}"
+                                Text="{Binding ImageLocation.OriginalRetentionDays, UpdateSourceTrigger=PropertyChanged}" />
+
+                            <TextBlock
+                                Grid.Row="6"
+                                Grid.Column="0"
+                                VerticalAlignment="Center"
+                                Style="{StaticResource MutedText}"
+                                Text="NG 图保留天数" />
+                            <TextBox
+                                Grid.Row="6"
+                                Grid.Column="1"
+                                Margin="0,4"
+                                Style="{StaticResource DarkTextBox}"
+                                Text="{Binding ImageLocation.NgRetentionDays, UpdateSourceTrigger=PropertyChanged}" />
+                        </Grid>
+                    </StackPanel>
+                </Border>
+            </TabItem>
+
+            <!--  ============ MES 设置 ============  -->
+            <TabItem Header="MES设置">
+                <Border Style="{StaticResource CardBorder}">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="160" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="160" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+
+                        <TextBlock
+                            Grid.Row="0"
+                            Grid.Column="0"
+                            VerticalAlignment="Center"
+                            Style="{StaticResource MutedText}"
+                            Text="MES 地址" />
+                        <TextBox
+                            Grid.Row="0"
+                            Grid.Column="1"
+                            Margin="0,4"
+                            Style="{StaticResource DarkTextBox}"
+                            Text="{Binding Mes.BaseUrl, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBlock
+                            Grid.Row="0"
+                            Grid.Column="2"
+                            VerticalAlignment="Center"
+                            Style="{StaticResource MutedText}"
+                            Text="MES 主机 IP" />
+                        <TextBox
+                            Grid.Row="0"
+                            Grid.Column="3"
+                            Margin="0,4"
+                            Style="{StaticResource DarkTextBox}"
+                            Text="{Binding Mes.HostIp, UpdateSourceTrigger=PropertyChanged}" />
+
+                        <TextBlock
+                            Grid.Row="1"
+                            Grid.Column="0"
+                            VerticalAlignment="Center"
+                            Style="{StaticResource MutedText}"
+                            Text="机种 ProductModel" />
+                        <TextBox
+                            Grid.Row="1"
+                            Grid.Column="1"
+                            Margin="0,4"
+                            Style="{StaticResource DarkTextBox}"
+                            Text="{Binding Mes.ProductModel, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBlock
+                            Grid.Row="1"
+                            Grid.Column="2"
+                            VerticalAlignment="Center"
+                            Style="{StaticResource MutedText}"
+                            Text="工程 ID" />
+                        <TextBox
+                            Grid.Row="1"
+                            Grid.Column="3"
+                            Margin="0,4"
+                            Style="{StaticResource DarkTextBox}"
+                            Text="{Binding Mes.EngineerId, UpdateSourceTrigger=PropertyChanged}" />
+
+                        <TextBlock
+                            Grid.Row="2"
+                            Grid.Column="0"
+                            VerticalAlignment="Center"
+                            Style="{StaticResource MutedText}"
+                            Text="工站 ID" />
+                        <TextBox
+                            Grid.Row="2"
+                            Grid.Column="1"
+                            Margin="0,4"
+                            Style="{StaticResource DarkTextBox}"
+                            Text="{Binding Mes.SubEngineerId, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBlock
+                            Grid.Row="2"
+                            Grid.Column="2"
+                            VerticalAlignment="Center"
+                            Style="{StaticResource MutedText}"
+                            Text="线别" />
+                        <TextBox
+                            Grid.Row="2"
+                            Grid.Column="3"
+                            Margin="0,4"
+                            Style="{StaticResource DarkTextBox}"
+                            Text="{Binding Mes.LineName, UpdateSourceTrigger=PropertyChanged}" />
+
+                        <TextBlock
+                            Grid.Row="3"
+                            Grid.Column="0"
+                            VerticalAlignment="Center"
+                            Style="{StaticResource MutedText}"
+                            Text="设备编号" />
+                        <TextBox
+                            Grid.Row="3"
+                            Grid.Column="1"
+                            Margin="0,4"
+                            Style="{StaticResource DarkTextBox}"
+                            Text="{Binding Mes.EquipmentId, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBlock
+                            Grid.Row="3"
+                            Grid.Column="2"
+                            VerticalAlignment="Center"
+                            Style="{StaticResource MutedText}"
+                            Text="机台 Memo" />
+                        <TextBox
+                            Grid.Row="3"
+                            Grid.Column="3"
+                            Margin="0,4"
+                            Style="{StaticResource DarkTextBox}"
+                            Text="{Binding Mes.Memo, UpdateSourceTrigger=PropertyChanged}" />
+
+                        <TextBlock
+                            Grid.Row="4"
+                            Grid.Column="0"
+                            VerticalAlignment="Center"
+                            Style="{StaticResource MutedText}"
+                            Text="计算机编号" />
+                        <TextBox
+                            Grid.Row="4"
+                            Grid.Column="1"
+                            Margin="0,4"
+                            Style="{StaticResource DarkTextBox}"
+                            Text="{Binding Mes.ComputerNumber, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBlock
+                            Grid.Row="4"
+                            Grid.Column="2"
+                            VerticalAlignment="Center"
+                            Style="{StaticResource MutedText}"
+                            Text="FlowID" />
+                        <TextBox
+                            Grid.Row="4"
+                            Grid.Column="3"
+                            Margin="0,4"
+                            Style="{StaticResource DarkTextBox}"
+                            Text="{Binding Mes.FlowId, UpdateSourceTrigger=PropertyChanged}" />
+
+                        <TextBlock
+                            Grid.Row="5"
+                            Grid.Column="0"
+                            VerticalAlignment="Center"
+                            Style="{StaticResource MutedText}"
+                            Text="样品板条码" />
+                        <TextBox
+                            Grid.Row="5"
+                            Grid.Column="1"
+                            Margin="0,4"
+                            Style="{StaticResource DarkTextBox}"
+                            Text="{Binding Sample.SampleCode, UpdateSourceTrigger=PropertyChanged}" />
+                    </Grid>
+                </Border>
+            </TabItem>
+
+            <!--  ============ 通讯设置 ============  -->
+            <TabItem Header="通讯设置">
+                <Border Style="{StaticResource CardBorder}">
+                    <StackPanel>
+                        <StackPanel Orientation="Horizontal">
+                            <Button
+                                Command="{Binding AddPlcCommand}"
+                                Content="添加 PLC"
+                                Style="{StaticResource ControlButton}" />
+                            <Button
+                                Margin="10,0,0,0"
+                                Command="{Binding ConnectPlcCommand}"
+                                Content="连接 PLC"
+                                Style="{StaticResource SuccessButton}" />
+                            <Button
+                                Margin="10,0,0,0"
+                                Command="{Binding StartSocketCommand}"
+                                Content="启动复判 Socket"
+                                Style="{StaticResource PrimaryButton}" />
+                        </StackPanel>
+
+                        <DataGrid
+                            Margin="0,14,0,0"
+                            AutoGenerateColumns="False"
+                            CanUserAddRows="False"
+                            ItemsSource="{Binding PlcDevices}"
+                            MaxHeight="220">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Binding="{Binding Name}" Header="名称" Width="120" />
+                                <DataGridTextColumn Binding="{Binding Vendor}" Header="厂商" Width="120" />
+                                <DataGridTextColumn Binding="{Binding IpAddress}" Header="IP" Width="150" />
+                                <DataGridTextColumn Binding="{Binding Port}" Header="端口" Width="90" />
+                                <DataGridTextColumn Binding="{Binding StationNumber}" Header="站号" Width="80" />
+                                <DataGridTemplateColumn Header="操作" Width="90">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <Button
+                                                Command="{Binding DataContext.RemovePlcCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                                CommandParameter="{Binding}"
+                                                Content="移除"
+                                                Style="{StaticResource DangerButton}" />
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                            </DataGrid.Columns>
+                        </DataGrid>
+
+                        <!--  点位表：类型与个数可按点位配置  -->
+                        <TextBlock
+                            Margin="0,16,0,6"
+                            Style="{StaticResource SectionTitle}"
+                            Text="PLC 点位表（可编辑类型与读取个数）" />
+                        <TextBlock
+                            Margin="0,0,0,8"
+                            Style="{StaticResource MutedText}"
+                            Text="个数语义随类型变化：Bool/Int16/UInt16 每个占 1 个寄存器，Int32/UInt32/Float 占 2 个，Double/Int64 占 4 个，String 按字数读取（例如从连续寄存器读条码）。偏移 999 表示未启用。" />
+
+                        <DataGrid
+                            AutoGenerateColumns="False"
+                            CanUserAddRows="False"
+                            ItemsSource="{Binding PlcPoints}"
+                            MaxHeight="260">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn
+                                    Binding="{Binding Group, Mode=OneWay}"
+                                    Header="分组"
+                                    IsReadOnly="True"
+                                    Width="130" />
+                                <DataGridTextColumn
+                                    Binding="{Binding Name, Mode=OneWay}"
+                                    Header="点位"
+                                    IsReadOnly="True"
+                                    Width="90" />
+                                <DataGridTemplateColumn Header="区域" Width="90">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <ComboBox
+                                                Background="Transparent"
+                                                BorderThickness="0"
+                                                ItemsSource="{Binding DataContext.PlcAreas, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                                SelectedItem="{Binding Area, UpdateSourceTrigger=PropertyChanged}" />
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                                <DataGridTextColumn Binding="{Binding Offset}" Header="偏移" Width="70" />
+                                <DataGridTemplateColumn Header="数据类型" Width="110">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <ComboBox
+                                                Background="Transparent"
+                                                BorderThickness="0"
+                                                ItemsSource="{Binding DataContext.PlcDataTypes, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                                SelectedItem="{Binding DataType, UpdateSourceTrigger=PropertyChanged}" />
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                                <DataGridTextColumn Binding="{Binding Count}" Header="个数" Width="60" />
+                                <DataGridTemplateColumn Header="方向" Width="90">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <ComboBox
+                                                Background="Transparent"
+                                                BorderThickness="0"
+                                                ItemsSource="{Binding DataContext.PlcDirections, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                                SelectedItem="{Binding Direction, UpdateSourceTrigger=PropertyChanged}" />
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                                <DataGridTextColumn
+                                    Binding="{Binding Address, Mode=OneWay}"
+                                    Header="实际地址"
+                                    IsReadOnly="True"
+                                    Width="110" />
+                                <DataGridTextColumn Binding="{Binding Description}" Header="说明" Width="*" />
+                            </DataGrid.Columns>
+                        </DataGrid>
+                    </StackPanel>
+                </Border>
+            </TabItem>
+
+            <!--  ============ 数据库设置 ============  -->
+            <TabItem Header="数据库设置">
+                <Border Style="{StaticResource CardBorder}">
+                    <StackPanel>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="120" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="120" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+
+                            <TextBlock
+                                Grid.Row="0"
+                                Grid.Column="0"
+                                VerticalAlignment="Center"
+                                Style="{StaticResource MutedText}"
+                                Text="IP" />
+                            <TextBox
+                                Grid.Row="0"
+                                Grid.Column="1"
+                                Margin="0,4"
+                                Style="{StaticResource DarkTextBox}"
+                                Text="{Binding MySql.Ip, UpdateSourceTrigger=PropertyChanged}" />
+                            <TextBlock
+                                Grid.Row="0"
+                                Grid.Column="2"
+                                VerticalAlignment="Center"
+                                Style="{StaticResource MutedText}"
+                                Text="端口" />
+                            <TextBox
+                                Grid.Row="0"
+                                Grid.Column="3"
+                                Margin="0,4"
+                                Style="{StaticResource DarkTextBox}"
+                                Text="{Binding MySql.Port, UpdateSourceTrigger=PropertyChanged}" />
+
+                            <TextBlock
+                                Grid.Row="1"
+                                Grid.Column="0"
+                                VerticalAlignment="Center"
+                                Style="{StaticResource MutedText}"
+                                Text="数据库" />
+                            <TextBox
+                                Grid.Row="1"
+                                Grid.Column="1"
+                                Margin="0,4"
+                                Style="{StaticResource DarkTextBox}"
+                                Text="{Binding MySql.DatabaseName, UpdateSourceTrigger=PropertyChanged}" />
+                            <TextBlock
+                                Grid.Row="1"
+                                Grid.Column="2"
+                                VerticalAlignment="Center"
+                                Style="{StaticResource MutedText}"
+                                Text="用户" />
+                            <TextBox
+                                Grid.Row="1"
+                                Grid.Column="3"
+                                Margin="0,4"
+                                Style="{StaticResource DarkTextBox}"
+                                Text="{Binding MySql.UserName, UpdateSourceTrigger=PropertyChanged}" />
+
+                            <TextBlock
+                                Grid.Row="2"
+                                Grid.Column="0"
+                                VerticalAlignment="Center"
+                                Style="{StaticResource MutedText}"
+                                Text="密码" />
+                            <TextBox
+                                Grid.Row="2"
+                                Grid.Column="1"
+                                Margin="0,4"
+                                Style="{StaticResource DarkTextBox}"
+                                Text="{Binding MySql.Password, UpdateSourceTrigger=PropertyChanged}" />
+                            <TextBlock
+                                Grid.Row="2"
+                                Grid.Column="2"
+                                VerticalAlignment="Center"
+                                Style="{StaticResource MutedText}"
+                                Text="结果表 / 条码表" />
+                            <StackPanel
+                                Grid.Row="2"
+                                Grid.Column="3"
+                                Orientation="Horizontal">
+                                <TextBox
+                                    Width="120"
+                                    Margin="0,4"
+                                    Style="{StaticResource DarkTextBox}"
+                                    Text="{Binding MySql.ResultTable, UpdateSourceTrigger=PropertyChanged}" />
+                                <TextBox
+                                    Width="120"
+                                    Margin="8,4,0,4"
+                                    Style="{StaticResource DarkTextBox}"
+                                    Text="{Binding MySql.CodeTable, UpdateSourceTrigger=PropertyChanged}" />
+                            </StackPanel>
+                        </Grid>
+
+                        <StackPanel Margin="0,14,0,0" Orientation="Horizontal">
+                            <Button
+                                Command="{Binding TestDbCommand}"
+                                Content="测试连接"
+                                Style="{StaticResource ControlButton}" />
+                            <Button
+                                Margin="10,0,0,0"
+                                Command="{Binding EnsureSchemaCommand}"
+                                Content="连接并创建表"
+                                Style="{StaticResource PrimaryButton}" />
+                            <Button
+                                Margin="10,0,0,0"
+                                Command="{Binding SaveCommand}"
+                                Content="保存设置"
+                                Style="{StaticResource SuccessButton}" />
+                        </StackPanel>
+
+                        <StackPanel Margin="0,16,0,0" Orientation="Horizontal">
+                            <TextBox
+                                Width="150"
+                                Margin="0,0,10,0"
+                                materialDesign:HintAssist.Hint="LOT 号"
+                                Style="{StaticResource DarkTextBox}"
+                                Text="{Binding QueryLot, UpdateSourceTrigger=PropertyChanged}" />
+                            <Button
+                                Command="{Binding QueryByLotCommand}"
+                                Content="按 Lot 查询"
+                                Style="{StaticResource ControlButton}" />
+                            <TextBox
+                                Width="180"
+                                Margin="10,0,10,0"
+                                materialDesign:HintAssist.Hint="镭射码"
+                                Style="{StaticResource DarkTextBox}"
+                                Text="{Binding QueryLaserCode, UpdateSourceTrigger=PropertyChanged}" />
+                            <Button
+                                Command="{Binding QueryByLaserCodeCommand}"
+                                Content="按 Code 查询"
+                                Style="{StaticResource ControlButton}" />
+                            <Button
+                                Margin="10,0,0,0"
+                                Command="{Binding QueryAllCommand}"
+                                Content="查询所有"
+                                Style="{StaticResource ControlButton}" />
+                        </StackPanel>
+
+                        <DataGrid
+                            Margin="0,14,0,0"
+                            AutoGenerateColumns="False"
+                            CanUserAddRows="False"
+                            CanUserDeleteRows="False"
+                            IsReadOnly="True"
+                            ItemsSource="{Binding Records}"
+                            MaxHeight="260">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Binding="{Binding Index}" Header="ID" Width="60" />
+                                <DataGridTextColumn Binding="{Binding RecordTime}" Header="时间" Width="150" />
+                                <DataGridTextColumn Binding="{Binding PcsNumber}" Header="PCS 号" Width="90" />
+                                <DataGridTextColumn Binding="{Binding Result}" Header="结果" Width="90" />
+                                <DataGridTextColumn Binding="{Binding PaperCode}" Header="纸质码" Width="150" />
+                                <DataGridTextColumn Binding="{Binding LaserCode}" Header="镭射码" Width="180" />
+                                <DataGridTextColumn Binding="{Binding Lot}" Header="LOT" Width="120" />
+                                <DataGridTemplateColumn Header="操作" Width="90">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <Button
+                                                Command="{Binding DataContext.DeleteRecordCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                                CommandParameter="{Binding}"
+                                                Content="删除"
+                                                Style="{StaticResource DangerButton}" />
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                            </DataGrid.Columns>
+                        </DataGrid>
+                    </StackPanel>
+                </Border>
+            </TabItem>
+        </TabControl>
+
+        <TextBlock
+            Margin="0,14,0,0"
+            FontSize="13"
+            Foreground="{DynamicResource PrimaryBrush}"
+            Text="{Binding StatusText}" />
+    </StackPanel>
+</UserControl>

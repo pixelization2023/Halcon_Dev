@@ -1,0 +1,40 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <UseWPF>true</UseWPF>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+
+
+	<ItemGroup>
+		<PackageReference Include="LiveChartsCore.SkiaSharpView.WPF" Version="2.0.5" />
+    <PackageReference Include="SkiaSharp" Version="3.119.0" />
+		<PackageReference Include="MaterialDesignColors" Version="5.3.1" />
+		<PackageReference Include="MaterialDesignThemes" Version="5.3.1" />
+		<PackageReference Include="MaterialDesignThemes.Wpf" Version="1.0.1" />
+		<PackageReference Include="Prism.Core" Version="9.0.537" />
+		<PackageReference Include="Prism.DryIoc" Version="9.0.537" />
+		<PackageReference Include="Serilog" Version="4.3.1" />
+		<PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
+		<PackageReference Include="System.Drawing.Common" Version="10.0.5" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\Halcon\Halcon.Core.csproj" />
+		<ProjectReference Include="..\MVS.Core\MVS.Core.csproj" />
+		<ProjectReference Include="..\PLCModule\PLCModule.csproj" />
+		<ProjectReference Include="..\MESModule\MESModule.csproj" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <Reference Include="halcondotnet">
+	    <HintPath>C:\Program Files\MVTec\HALCON-25.11-Progress\bin\dotnet35\halcondotnet.dll</HintPath>
+	  </Reference>
+	  <Reference Include="hdevenginedotnet">
+	    <HintPath>C:\Program Files\MVTec\HALCON-25.11-Progress\bin\dotnet35\hdevenginedotnet.dll</HintPath>
+	  </Reference>
+	</ItemGroup>
+</Project>

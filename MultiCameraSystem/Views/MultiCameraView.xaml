@@ -1,0 +1,197 @@
+<UserControl
+    x:Class="MultiCameraSystem.Views.MultiCameraView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:convert="clr-namespace:MultiCameraSystem.Convert"
+    xmlns:i="http://schemas.microsoft.com/xaml/behaviors"
+    xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+    xmlns:prism="http://prismlibrary.com/"
+    prism:ViewModelLocator.AutoWireViewModel="True"
+    Background="Transparent">
+
+    <UserControl.Resources>
+        <convert:ZeroToVisibilityConverter x:Key="ZeroToVisibility" />
+        <convert:InverseBooleanToVisibilityConverter x:Key="InverseBoolToVis" />
+    </UserControl.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!--  页面头：标题 + 说明 + 刷新  -->
+        <Grid Grid.Row="0" Margin="0,0,0,16">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <StackPanel>
+                <TextBlock Style="{StaticResource PageTitle}" Text="多相机概览" />
+                <TextBlock
+                    Margin="0,6,0,0"
+                    Style="{StaticResource MutedText}"
+                    Text="{Binding Cameras.Count, StringFormat=已发现 {0} 台设备}" />
+            </StackPanel>
+
+            <Button
+                Grid.Column="1"
+                VerticalAlignment="Bottom"
+                Command="{Binding RefreshCommand}"
+                Style="{StaticResource IconButton}"
+                ToolTip="刷新设备列表">
+                <materialDesign:PackIcon
+                    Width="18"
+                    Height="18"
+                    Foreground="{DynamicResource PrimaryBrush}"
+                    Kind="Refresh" />
+            </Button>
+        </Grid>
+
+        <!--  空状态  -->
+        <Border
+            Grid.Row="1"
+            Padding="40"
+            HorizontalAlignment="Stretch"
+            VerticalAlignment="Center"
+            Style="{StaticResource CardBorder}"
+            Visibility="{Binding Cameras.Count, Converter={StaticResource ZeroToVisibility}}">
+            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                <materialDesign:PackIcon
+                    Width="48"
+                    Height="48"
+                    Foreground="{DynamicResource TextMutedBrush}"
+                    Kind="CameraOff" />
+                <TextBlock
+                    Margin="0,12,0,4"
+                    HorizontalAlignment="Center"
+                    FontSize="15"
+                    FontWeight="Medium"
+                    Foreground="{DynamicResource TextMutedBrush}"
+                    Text="未发现相机设备" />
+                <TextBlock
+                    HorizontalAlignment="Center"
+                    FontSize="12"
+                    Foreground="{DynamicResource TextMutedBrush}"
+                    Text="请检查设备连接后点击刷新" />
+            </StackPanel>
+        </Border>
+
+        <!--  相机列表  -->
+        <ScrollViewer
+            Grid.Row="1"
+            HorizontalScrollBarVisibility="Disabled"
+            VerticalScrollBarVisibility="Auto">
+            <ItemsControl ItemsSource="{Binding Cameras}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Border
+                            Margin="0,0,0,10"
+                            Background="Transparent"
+                            Style="{StaticResource CameraCardBorder}"
+                            Tag="{Binding SerialNumber}">
+                            <i:Interaction.Triggers>
+                                <i:EventTrigger EventName="MouseLeftButtonDown">
+                                    <i:InvokeCommandAction Command="{Binding DataContext.SelectCameraCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding}" />
+                                </i:EventTrigger>
+                            </i:Interaction.Triggers>
+                            <Grid>
+
+
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+
+                                <!--  图标 + 状态  -->
+                                <StackPanel
+                                    Grid.Column="0"
+                                    Margin="0,0,14,0"
+                                    VerticalAlignment="Center">
+                                    <Border
+                                        Width="44"
+                                        Height="44"
+                                        Background="{DynamicResource PrimaryTintBrush}"
+                                        CornerRadius="10">
+                                        <materialDesign:PackIcon
+                                            Width="22"
+                                            Height="22"
+                                            HorizontalAlignment="Center"
+                                            VerticalAlignment="Center"
+                                            Foreground="{DynamicResource PrimaryBrush}"
+                                            Kind="Camera" />
+                                    </Border>
+                                    <Ellipse
+                                        Width="8"
+                                        Height="8"
+                                        Margin="0,6,0,0"
+                                        HorizontalAlignment="Center">
+                                        <Ellipse.Style>
+                                            <Style TargetType="Ellipse">
+                                                <Setter Property="Fill" Value="{DynamicResource DisconnectedBrush}" />
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding Status}" Value="true">
+                                                        <Setter Property="Fill" Value="{DynamicResource ConnectedBrush}" />
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding Status}" Value="false">
+                                                        <Setter Property="Fill" Value="{DynamicResource DisconnectedBrush}" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Ellipse.Style>
+                                    </Ellipse>
+                                </StackPanel>
+
+                                <!--  信息  -->
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                    <TextBlock
+                                        FontSize="14"
+                                        FontWeight="SemiBold"
+                                        Foreground="{DynamicResource TextPrimaryBrush}"
+                                        Text="{Binding ModelName, TargetNullValue='未知型号'}" />
+                                    <StackPanel Margin="0,4,0,0" Orientation="Horizontal">
+                                        <TextBlock
+                                            FontSize="11"
+                                            Foreground="{DynamicResource TextMutedBrush}"
+                                            Text="S/N:" />
+                                        <TextBlock
+                                            Margin="4,0,0,0"
+                                            FontSize="11"
+                                            Foreground="{DynamicResource TextSecondaryBrush}"
+                                            Text="{Binding SerialNumber}" />
+                                    </StackPanel>
+                                    <StackPanel Margin="0,2,0,0" Orientation="Horizontal">
+                                        <materialDesign:PackIcon
+                                            Width="12"
+                                            Height="12"
+                                            Foreground="{DynamicResource TextMutedBrush}"
+                                            Kind="Ethernet" />
+                                        <TextBlock
+                                            Margin="4,0,8,0"
+                                            FontSize="11"
+                                            Foreground="{DynamicResource TextMutedBrush}"
+                                            Text="{Binding DeviceType, TargetNullValue='--'}" />
+                                        <TextBlock
+                                            FontSize="11"
+                                            Foreground="{DynamicResource TextMutedBrush}"
+                                            Text="{Binding ManufacturerName, TargetNullValue='--'}" />
+                                    </StackPanel>
+                                </StackPanel>
+
+                                <!--  箭头  -->
+                                <materialDesign:PackIcon
+                                    Grid.Column="2"
+                                    Width="20"
+                                    Height="20"
+                                    VerticalAlignment="Center"
+                                    Foreground="{DynamicResource TextMutedBrush}"
+                                    Kind="ChevronRight" />
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </ScrollViewer>
+    </Grid>
+</UserControl>

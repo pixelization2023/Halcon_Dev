@@ -1,0 +1,208 @@
+<UserControl
+    x:Class="Inspection.Views.InspectionConfigView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+    xmlns:prism="http://prismlibrary.com/"
+    prism:ViewModelLocator.AutoWireViewModel="True">
+
+    <StackPanel>
+        <TextBlock Style="{StaticResource PageTitle}" Text="检测配方配置" />
+        <TextBlock Style="{StaticResource MutedText}" Text="把 Halcon 过程（原 VisionMaster 流程）与图片索引、PCS 个数、检测项目数绑定；扫码流程的过程名需包含「扫码」。" />
+
+        <!--  新增配方  -->
+        <Border Margin="0,16,0,0" Style="{StaticResource CardBorder}">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="2*" />
+                    <ColumnDefinition Width="2*" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <TextBox
+                    Grid.Column="0"
+                    Margin="0,0,10,0"
+                    materialDesign:HintAssist.Hint="过程名 / 流程名"
+                    Style="{StaticResource DarkTextBox}"
+                    Text="{Binding NewProcedureName, UpdateSourceTrigger=PropertyChanged}" />
+                <TextBox
+                    Grid.Column="1"
+                    Margin="0,0,10,0"
+                    materialDesign:HintAssist.Hint="图片索引（如 1,2,3）"
+                    Style="{StaticResource DarkTextBox}"
+                    Text="{Binding NewImageIndexes, UpdateSourceTrigger=PropertyChanged}" />
+                <TextBox
+                    Grid.Column="2"
+                    Margin="0,0,10,0"
+                    materialDesign:HintAssist.Hint="PCS 个数"
+                    Style="{StaticResource DarkTextBox}"
+                    Text="{Binding NewPcsPerImage, UpdateSourceTrigger=PropertyChanged}" />
+                <TextBox
+                    Grid.Column="3"
+                    Margin="0,0,10,0"
+                    materialDesign:HintAssist.Hint="检测项目数"
+                    Style="{StaticResource DarkTextBox}"
+                    Text="{Binding NewItemCount, UpdateSourceTrigger=PropertyChanged}" />
+                <Button
+                    Grid.Column="4"
+                    Command="{Binding AddRecipeCommand}"
+                    Content="添加流程绑定"
+                    Style="{StaticResource PrimaryButton}" />
+            </Grid>
+        </Border>
+
+        <!--  配方列表  -->
+        <Border Margin="0,16,0,0" Style="{StaticResource CardBorder}">
+            <StackPanel>
+                <TextBlock Style="{StaticResource SectionTitle}" Text="流程绑定列表" />
+                <DataGrid
+                    AutoGenerateColumns="False"
+                    CanUserAddRows="False"
+                    ItemsSource="{Binding Recipes}"
+                    MaxHeight="280">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Binding="{Binding ProcedureName}" Header="过程名" Width="200" />
+                        <DataGridTextColumn Binding="{Binding ImageIndexes}" Header="图片索引" Width="160" />
+                        <DataGridTextColumn Binding="{Binding PcsPerImage}" Header="PCS 个数" Width="100" />
+                        <DataGridTextColumn Binding="{Binding ItemCount}" Header="检测项目数" Width="110" />
+                        <DataGridTextColumn Binding="{Binding ResultOutputPattern}" Header="结果输出模板" Width="140" />
+                        <DataGridTextColumn Binding="{Binding BoxOutputPattern}" Header="框输出模板" Width="140" />
+                        <DataGridTemplateColumn Header="操作" Width="90">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <Button
+                                        Command="{Binding DataContext.RemoveRecipeCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                        CommandParameter="{Binding}"
+                                        Content="移除"
+                                        Style="{StaticResource DangerButton}" />
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+                    </DataGrid.Columns>
+                </DataGrid>
+
+                <StackPanel Margin="0,14,0,0" Orientation="Horizontal">
+                    <Button
+                        Command="{Binding QueryInterfaceCommand}"
+                        Content="查询过程接口"
+                        Style="{StaticResource ControlButton}" />
+                    <Button
+                        Margin="10,0,0,0"
+                        Command="{Binding DiscoverProceduresCommand}"
+                        Content="扫描方案文件"
+                        Style="{StaticResource ControlButton}" />
+                    <Button
+                        Margin="10,0,0,0"
+                        Command="{Binding SaveCommand}"
+                        Content="保存配置"
+                        Style="{StaticResource SuccessButton}" />
+                </StackPanel>
+
+                <TextBlock
+                    Margin="0,12,0,0"
+                    FontFamily="Consolas"
+                    FontSize="12"
+                    Foreground="{DynamicResource TextSecondaryBrush}"
+                    Text="{Binding InterfaceInfo}" />
+            </StackPanel>
+        </Border>
+
+        <Grid Margin="0,16,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <!--  二维码与图片绑定  -->
+            <Border
+                Grid.Column="0"
+                Margin="0,0,10,0"
+                Style="{StaticResource CardBorder}">
+                <StackPanel>
+                    <TextBlock Style="{StaticResource SectionTitle}" Text="二维码与图片绑定" />
+                    <DataGrid
+                        AutoGenerateColumns="False"
+                        CanUserAddRows="False"
+                        ItemsSource="{Binding CodeBindings}"
+                        MaxHeight="220">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Binding="{Binding CodeIndex}" Header="二维码索引" Width="110" />
+                            <DataGridTextColumn Binding="{Binding ImageIndexes}" Header="图片索引（用 。 或 , 分隔）" Width="*" />
+                            <DataGridTemplateColumn Header="操作" Width="90">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <Button
+                                            Command="{Binding DataContext.RemoveBindingCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                            CommandParameter="{Binding}"
+                                            Content="移除"
+                                            Style="{StaticResource DangerButton}" />
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                    <Button
+                        Margin="0,12,0,0"
+                        HorizontalAlignment="Left"
+                        Command="{Binding AddBindingCommand}"
+                        Content="添加绑定"
+                        Style="{StaticResource ControlButton}" />
+                </StackPanel>
+            </Border>
+
+            <!--  上传顺序 + 检测项  -->
+            <Border Grid.Column="1" Style="{StaticResource CardBorder}">
+                <StackPanel>
+                    <TextBlock Style="{StaticResource SectionTitle}" Text="上传顺序绑定" />
+                    <TextBox
+                        materialDesign:HintAssist.Hint="按真实 PCS 位置顺序，逗号分隔"
+                        Style="{StaticResource DarkTextBox}"
+                        Text="{Binding UploadOrderText, UpdateSourceTrigger=PropertyChanged}" />
+
+                    <TextBlock
+                        Margin="0,16,0,0"
+                        Style="{StaticResource SectionTitle}"
+                        Text="主界面检测项显示" />
+                    <StackPanel Orientation="Horizontal">
+                        <TextBox
+                            Width="200"
+                            materialDesign:HintAssist.Hint="检测项名称"
+                            Style="{StaticResource DarkTextBox}"
+                            Text="{Binding NewDetectionItem, UpdateSourceTrigger=PropertyChanged}" />
+                        <Button
+                            Margin="10,0,0,0"
+                            Command="{Binding AddDetectionItemCommand}"
+                            Content="添加"
+                            Style="{StaticResource ControlButton}" />
+                    </StackPanel>
+                    <ItemsControl Margin="0,8,0,0" ItemsSource="{Binding DetectionItems}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <StackPanel Margin="0,2" Orientation="Horizontal">
+                                    <TextBlock
+                                        Width="220"
+                                        VerticalAlignment="Center"
+                                        Foreground="{DynamicResource TextSecondaryBrush}"
+                                        Text="{Binding}" />
+                                    <Button
+                                        Command="{Binding DataContext.RemoveDetectionItemCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                        CommandParameter="{Binding}"
+                                        Content="移除"
+                                        Style="{StaticResource DangerButton}" />
+                                </StackPanel>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </Border>
+        </Grid>
+
+        <TextBlock
+            Margin="0,14,0,0"
+            FontSize="13"
+            Foreground="{DynamicResource PrimaryBrush}"
+            Text="{Binding StatusText}" />
+    </StackPanel>
+</UserControl>
