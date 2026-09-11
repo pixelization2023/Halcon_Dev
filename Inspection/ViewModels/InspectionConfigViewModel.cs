@@ -53,6 +53,7 @@ namespace Inspection.ViewModels
             RemoveRecipeCommand = new DelegateCommand<InspectionRecipe>(ExecuteRemoveRecipe);
             SaveCommand = new DelegateCommand(ExecuteSave);
             QueryInterfaceCommand = new DelegateCommand(async () => await ExecuteQueryInterfaceAsync());
+            ValidateInterfaceCommand = new DelegateCommand(async () => await ExecuteValidateInterfaceAsync());
             AddBindingCommand = new DelegateCommand(ExecuteAddBinding);
             RemoveBindingCommand = new DelegateCommand<ImageCodeBindingItem>(ExecuteRemoveBinding);
             AddDetectionItemCommand = new DelegateCommand(ExecuteAddDetectionItem);
@@ -66,6 +67,48 @@ namespace Inspection.ViewModels
         public ObservableCollection<ImageCodeBindingItem> CodeBindings { get; } = new();
         public ObservableCollection<string> DetectionItems { get; } = new();
         public ObservableCollection<string> DiscoveredProcedures { get; } = new();
+
+        /// <summary>
+        /// 「配方 ↔ 方案接口」一致性校验结果（一条一行）。
+        /// 为什么要有：配方模板名与 .hdev 实际输出名对不上时，程序"检测成功、日志正常"，
+        /// 但界面上没有图、结果串为空 —— 没有任何报错，只能靠人肉比对。这里把它显式列出来。
+        /// </summary>
+        public ObservableCollection<string> InterfaceIssues { get; } = new();
+
+        /// <summary>多窗口显示：每个窗口的绑定规则（与 ProductConfiguration.Display.Windows 同步）</summary>
+        public ObservableCollection<DisplayWindowSpec> DisplayWindows { get; } = new();
+
+        /// <summary>窗口绑定方式下拉项</summary>
+        public IReadOnlyList<DisplayBindMode> BindModes { get; } = new[]
+        {
+            DisplayBindMode.ByPcs,
+            DisplayBindMode.ByKey,
+            DisplayBindMode.ByImage,
+            DisplayBindMode.Follow
+        };
+
+        /// <summary>窗口图像来源下拉项</summary>
+        public IReadOnlyList<DisplayImageSource> ImageSources { get; } = new[]
+        {
+            DisplayImageSource.Auto,
+            DisplayImageSource.ResultImage,
+            DisplayImageSource.OriginalImage
+        };
+
+        /// <summary>窗口判定过滤下拉项</summary>
+        public IReadOnlyList<DisplayJudgmentFilter> JudgmentFilters { get; } = new[]
+        {
+            DisplayJudgmentFilter.Any,
+            DisplayJudgmentFilter.OkOnly,
+            DisplayJudgmentFilter.NgOnly
+        };
+
+        /// <summary>窗口缩放方式下拉项</summary>
+        public IReadOnlyList<DisplayScaleMode> ScaleModes { get; } = new[]
+        {
+            DisplayScaleMode.Fit,
+            DisplayScaleMode.None
+        };
 
         #endregion
 
@@ -127,6 +170,52 @@ namespace Inspection.ViewModels
             set => SetProperty(ref _statusText, value);
         }
 
+        // ---- 多窗口显示设置（对应 ProductConfiguration.Display）----
+
+        private bool _displayEnabled = true;
+        /// <summary>是否启用多窗口显示</summary>
+        public bool DisplayEnabled
+        {
+            get => _displayEnabled;
+            set => SetProperty(ref _displayEnabled, value);
+        }
+
+        private int _displayWindowCount = 4;
+        /// <summary>显示窗口个数（1~16）</summary>
+        public int DisplayWindowCount
+        {
+            get => _displayWindowCount;
+            set
+            {
+                var clamped = Math.Clamp(value, 1, DisplaySettings.MaxWindowCount);
+                if (SetProperty(ref _displayWindowCount, clamped))
+                    SyncDisplayWindowList();
+            }
+        }
+
+        private int _displayColumns = 2;
+        /// <summary>每行窗口数（0 = 自动）</summary>
+        public int DisplayColumns
+        {
+            get => _displayColumns;
+            set => SetProperty(ref _displayColumns, Math.Clamp(value, 0, DisplaySettings.MaxWindowCount));
+        }
+
+        private EmptyWindowMode _emptyWindowMode = EmptyWindowMode.Empty;
+        /// <summary>没有结果时窗口里显示什么</summary>
+        public EmptyWindowMode EmptyWindowMode
+        {
+            get => _emptyWindowMode;
+            set => SetProperty(ref _emptyWindowMode, value);
+        }
+
+        /// <summary>空窗显示模式下拉项</summary>
+        public IReadOnlyList<EmptyWindowMode> EmptyModes { get; } = new[]
+        {
+            EmptyWindowMode.Empty,
+            EmptyWindowMode.OriginalImage
+        };
+
         public bool CanEdit => _session.IsEngineer;
 
         #endregion
@@ -137,6 +226,7 @@ namespace Inspection.ViewModels
         public DelegateCommand<InspectionRecipe> RemoveRecipeCommand { get; }
         public DelegateCommand SaveCommand { get; }
         public DelegateCommand QueryInterfaceCommand { get; }
+        public DelegateCommand ValidateInterfaceCommand { get; }
         public DelegateCommand AddBindingCommand { get; }
         public DelegateCommand<ImageCodeBindingItem> RemoveBindingCommand { get; }
         public DelegateCommand AddDetectionItemCommand { get; }
@@ -209,14 +299,63 @@ namespace Inspection.ViewModels
                 .Select((text, index) => (text, index))
                 .ToDictionary(x => (x.index + 1).ToString(), x => x.text);
 
+            // 多窗口显示设置（v3 新增：窗口个数 / 每行列数 / 每格绑定哪个 PCS）
+            ApplyDisplaySettings(cfg);
+
             if (_repository.Save(cfg))
             {
                 _logger.Information("检测配置已保存");
                 StatusText = "保存成功";
+
+                // 通知主监控台立刻按新的显示设置重建窗口。
+                // 不通知的话，用户在配置页改完绑定方式 / NG 框样式，
+                // 切回主监控台看到的还是旧规则（要等下次加载产品才生效）。
+                _orchestrator.NotifyConfigurationChanged();
+
+                RunInterfaceValidation(cfg);
             }
             else
             {
                 StatusText = "保存失败";
+            }
+        }
+
+        /// <summary>
+        /// 保存后同步跑一次接口一致性校验（引擎已缓存，开销很小），
+        /// 把「配方与方案不一致」直接显示出来 —— 这是 P0-1 的现场防护。
+        /// </summary>
+        private void RunInterfaceValidation(ProductConfiguration cfg)
+        {
+            InterfaceIssues.Clear();
+
+            foreach (var recipe in cfg.Recipes.ToList())
+            {
+                List<string> issues;
+                try
+                {
+                    issues = _halcon.ValidateRecipeAgainstInterface(cfg, recipe);
+                }
+                catch (Exception ex)
+                {
+                    issues = new List<string> { $"校验异常: {ex.Message}" };
+                }
+
+                if (issues.Count == 0)
+                {
+                    InterfaceIssues.Add($"✔ {recipe.ProcedureName}：配方与方案接口一致");
+                }
+                else
+                {
+                    foreach (var issue in issues)
+                        InterfaceIssues.Add($"✘ {recipe.ProcedureName}：{issue}");
+                }
+            }
+
+            var problemCount = InterfaceIssues.Count(i => i.StartsWith("✘", StringComparison.Ordinal));
+            if (problemCount > 0)
+            {
+                StatusText = $"保存成功，但发现 {problemCount} 处配方与方案接口不一致（见下方清单）";
+                _logger.Warning("保存后一致性校验发现 {Count} 处问题", problemCount);
             }
         }
 
@@ -251,9 +390,124 @@ namespace Inspection.ViewModels
             });
         }
 
+        /// <summary>
+        /// 配方 ↔ 方案接口 一致性校验。
+        /// 逐条配方比对「模板名」与「.hdev 实际声明的参数名」，把不一致的地方列出来。
+        /// 这是 P0-1 的界面入口：以前"带图不出来"只能靠人肉查 .hdev。
+        /// </summary>
+        private async Task ExecuteValidateInterfaceAsync()
+        {
+            var cfg = _orchestrator.Configuration;
+            if (cfg == null)
+            {
+                StatusText = "请先加载产品";
+                return;
+            }
+
+            if (cfg.Recipes.Count == 0)
+            {
+                StatusText = "请先添加配方";
+                return;
+            }
+
+            InterfaceIssues.Clear();
+            StatusText = "正在校验配方与方案接口…";
+
+            var recipes = cfg.Recipes.ToList();
+            await Task.Run(() =>
+            {
+                foreach (var recipe in recipes)
+                {
+                    List<string> issues;
+                    try
+                    {
+                        issues = _halcon.ValidateRecipeAgainstInterface(cfg, recipe);
+                    }
+                    catch (Exception ex)
+                    {
+                        issues = new List<string> { $"校验异常: {ex.Message}" };
+                    }
+
+                    if (issues.Count == 0)
+                    {
+                        InterfaceIssues.Add($"✔ {recipe.ProcedureName}：配方与方案接口一致");
+                    }
+                    else
+                    {
+                        foreach (var issue in issues)
+                            InterfaceIssues.Add($"✘ {recipe.ProcedureName}：{issue}");
+                    }
+                }
+            });
+
+            var problemCount = InterfaceIssues.Count(i => i.StartsWith("✘", StringComparison.Ordinal));
+            StatusText = problemCount == 0
+                ? $"校验通过：{recipes.Count} 个配方与方案接口一致"
+                : $"发现 {problemCount} 处不一致（见下方清单）；运行时会按顺序兜底，但建议改齐";
+        }
+
         private void ExecuteAddBinding()
         {
             CodeBindings.Add(new ImageCodeBindingItem { CodeIndex = CodeBindings.Count.ToString(), ImageIndexes = string.Empty });
+        }
+
+        /// <summary>
+        /// 把「窗口个数」同步到窗口列表：多了裁掉、少了补默认绑定。
+        /// 默认绑定为"第 i 个窗口看 PCS i"，现场改起来最直观。
+        /// </summary>
+        private void SyncDisplayWindowList()
+        {
+            // 裁掉多余的（从尾部）
+            while (DisplayWindows.Count > _displayWindowCount)
+                DisplayWindows.RemoveAt(DisplayWindows.Count - 1);
+
+            // 补齐缺的
+            for (int i = DisplayWindows.Count; i < _displayWindowCount; i++)
+            {
+                DisplayWindows.Add(new DisplayWindowSpec
+                {
+                    Index = i + 1,
+                    Bind = DisplayBindMode.ByPcs,
+                    Target = (i + 1).ToString(),
+                    Source = DisplayImageSource.Auto,
+                    ShowNgBoxes = true,
+                    ShowItemText = true
+                });
+            }
+
+            // 重排序号，保证与界面行号一致
+            for (int i = 0; i < DisplayWindows.Count; i++)
+                DisplayWindows[i].Index = i + 1;
+        }
+
+        /// <summary>把界面上的显示设置写回产品配置</summary>
+        private void ApplyDisplaySettings(ProductConfiguration cfg)
+        {
+            cfg.Display ??= new DisplaySettings();
+
+            cfg.Display.Enabled = DisplayEnabled;
+            cfg.Display.WindowCount = Math.Clamp(_displayWindowCount, 1, DisplaySettings.MaxWindowCount);
+            cfg.Display.Columns = Math.Clamp(_displayColumns, 0, cfg.Display.WindowCount);
+            cfg.Display.EmptyMode = EmptyWindowMode;
+
+            cfg.Display.Windows = DisplayWindows.Take(cfg.Display.WindowCount)
+                .Select(w => new DisplayWindowSpec
+                {
+                    Index = w.Index,
+                    Title = w.Title,
+                    Bind = w.Bind,
+                    Target = w.Target,
+                    Source = w.Source,
+                    ShowNgBoxes = w.ShowNgBoxes,
+                    ShowItemText = w.ShowItemText,
+                    Filter = w.Filter,
+                    BoxColor = w.BoxColor,
+                    BoxLineWidth = w.BoxLineWidth,
+                    Scale = w.Scale
+                })
+                .ToList();
+
+            cfg.Display.Normalize();
         }
 
         private void ExecuteRemoveBinding(ImageCodeBindingItem? item)
@@ -302,6 +556,7 @@ namespace Inspection.ViewModels
             CodeBindings.Clear();
             DetectionItems.Clear();
             DiscoveredProcedures.Clear();
+            DisplayWindows.Clear();
 
             var cfg = _orchestrator.Configuration;
             if (cfg == null)
@@ -316,8 +571,26 @@ namespace Inspection.ViewModels
 
             foreach (var kv in cfg.DetectionItems) DetectionItems.Add(kv.Value);
 
+            // 多窗口显示设置：先把配置规整化（老配置可能没有窗口定义），再灌进界面集合
+            cfg.NormalizeDisplay();
+            _displayEnabled = cfg.Display.Enabled;
+            _displayWindowCount = cfg.Display.WindowCount;
+            _displayColumns = cfg.Display.Columns;
+            _emptyWindowMode = cfg.Display.EmptyMode;
+
+            foreach (var spec in cfg.Display.Windows)
+                DisplayWindows.Add(spec);
+
+            SyncDisplayWindowList();
+
+            RaisePropertyChanged(nameof(DisplayEnabled));
+            RaisePropertyChanged(nameof(DisplayWindowCount));
+            RaisePropertyChanged(nameof(DisplayColumns));
+            RaisePropertyChanged(nameof(EmptyWindowMode));
+
             UploadOrderText = string.Join(",", cfg.UploadOrder);
-            StatusText = $"已加载 {cfg.ProductName} 的检测配置（{cfg.Recipes.Count} 个配方）";
+            StatusText = $"已加载 {cfg.ProductName} 的检测配置（{cfg.Recipes.Count} 个配方，" +
+                         $"{cfg.Display.WindowCount} 个显示窗口）";
         }
 
         #endregion

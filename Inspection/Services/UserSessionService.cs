@@ -36,10 +36,32 @@ namespace Inspection.Services
                     RaisePropertyChanged(nameof(IsLoggedIn));
                     RaisePropertyChanged(nameof(IsEngineer));
                     RaisePropertyChanged(nameof(IsOperator));
+                    RaisePropertyChanged(nameof(CurrentUserRole));
+                    RaisePropertyChanged(nameof(RoleText));
                     RoleChanged?.Invoke(this, value);
                 }
             }
         }
+
+        /// <summary>
+        /// 可选账号名（供登录界面下拉）。
+        /// 说明：旧实现里登录页有一个账号下拉，但它绑定的属性在 ViewModel 上**并不存在**
+        ///（只有 LoginViewModel 里一个硬编码数组），换个界面就退化成"空白下拉"。
+        /// 账号清单的唯一真源放在这里，界面只消费。
+        /// </summary>
+        public IReadOnlyList<string> AccountNames => _accounts.Keys.ToList();
+
+        /// <summary>角色序号，供导航项按角色过滤使用（None=0 &lt; Operator &lt; Engineer &lt; Administrator）</summary>
+        public int CurrentUserRole => (int)Role;
+
+        /// <summary>角色显示文本</summary>
+        public string RoleText => Role switch
+        {
+            UserRole.Operator => "操作员",
+            UserRole.Engineer => "工程师",
+            UserRole.Administrator => "管理员",
+            _ => "未登录"
+        };
 
         private string _userName = string.Empty;
         /// <summary>当前登录用户名</summary>

@@ -16,7 +16,16 @@
     WindowStyle="None">
 
     <Window.Resources>
-        <!--  侧栏导航项：图标 + 小字，选中时主色竖条 + 淡色底（参考 Radiograph / Wally）  -->
+        <!--
+            侧栏导航项：图标 + 小字，选中时主色竖条 + 淡色底（参考 Radiograph / Wally）。
+            
+            选中态为什么读 Button.Tag 而不是直接读 DataContext.IsSelected：
+            本 Style 也被"底部固定：外观主题"那个 Button 复用，而它不在 ItemsControl
+            的 ItemTemplate 里，DataContext 是 MainWindowViewModel（没有 IsSelected），
+            直接绑 IsSelected 会在 VS 的"XAML 绑定失败"面板里报两条错、调试输出也会刷绑定错误。
+            改为读 Tag 后：导航项由 ItemTemplate 设 Tag={Binding IsSelected}，底部按钮不设 Tag
+            （null 与 True 不相等 → 不激活选中态），属性恒定存在，绑定永不失败。
+        -->
         <Style x:Key="RailNavButton" TargetType="Button">
             <Setter Property="Width" Value="64" />
             <Setter Property="Height" Value="46" />
@@ -30,7 +39,10 @@
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
                         <Grid>
-                            <Border x:Name="bd" Background="{TemplateBinding Background}" CornerRadius="10" />
+                            <Border
+                                x:Name="bd"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="10" />
                             <Border
                                 x:Name="bar"
                                 Width="3"
@@ -43,7 +55,7 @@
                             <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
                         </Grid>
                         <ControlTemplate.Triggers>
-                            <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                            <DataTrigger Binding="{Binding Tag, RelativeSource={RelativeSource TemplatedParent}}" Value="True">
                                 <Setter TargetName="bd" Property="Background" Value="{DynamicResource NavRailActiveBrush}" />
                                 <Setter TargetName="bar" Property="Visibility" Value="Visible" />
                             </DataTrigger>
@@ -56,7 +68,7 @@
                 </Setter.Value>
             </Setter>
             <Style.Triggers>
-                <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                <DataTrigger Binding="{Binding Tag, RelativeSource={RelativeSource Self}}" Value="True">
                     <Setter Property="Foreground" Value="White" />
                 </DataTrigger>
             </Style.Triggers>
@@ -219,7 +231,10 @@
                         Command="{Binding ToggleLogPanelCommand}"
                         Style="{StaticResource WindowButton}"
                         ToolTip="实时日志">
-                        <materialDesign:PackIcon Width="15" Height="15" Kind="Text" />
+                        <materialDesign:PackIcon
+                            Width="15"
+                            Height="15"
+                            Kind="Text" />
                     </Button>
 
                     <!--  主题快速切换  -->
@@ -313,7 +328,10 @@
                         Click="MinimizeWindow_Click"
                         Style="{StaticResource WindowButton}"
                         ToolTip="最小化">
-                        <materialDesign:PackIcon Width="13" Height="13" Kind="WindowMinimize" />
+                        <materialDesign:PackIcon
+                            Width="13"
+                            Height="13"
+                            Kind="WindowMinimize" />
                     </Button>
                     <Button
                         Click="MaximizeWindow_Click"
@@ -330,7 +348,10 @@
                         Click="CloseWindow_Click"
                         Style="{StaticResource WindowCloseButton}"
                         ToolTip="关闭">
-                        <materialDesign:PackIcon Width="13" Height="13" Kind="WindowClose" />
+                        <materialDesign:PackIcon
+                            Width="13"
+                            Height="13"
+                            Kind="WindowClose" />
                     </Button>
                 </StackPanel>
             </Grid>
@@ -361,13 +382,41 @@
                                             Command="{Binding DataContext.NavigateCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
                                             CommandParameter="{Binding}"
                                             Style="{StaticResource RailNavButton}"
+                                            Tag="{Binding IsSelected}"
                                             ToolTip="{Binding Title}">
                                             <StackPanel>
-                                                <materialDesign:PackIcon
-                                                    Width="18"
-                                                    Height="18"
-                                                    HorizontalAlignment="Center"
-                                                    Kind="{Binding Icon}" />
+                                                <Grid>
+                                                    <materialDesign:PackIcon
+                                                        Width="18"
+                                                        Height="18"
+                                                        HorizontalAlignment="Center"
+                                                        Kind="{Binding Icon}" />
+                                                    <!--
+                                                        锁角标：当前角色进不去这个页面时显示。
+                                                        注意这不是禁用按钮 —— 点上去会提示需要什么权限并弹出登录对话框。
+                                                        （以前是直接把受限页从导航里删掉，现场表现就是"很多界面不见了"。）
+                                                    -->
+                                                    <materialDesign:PackIcon
+                                                        Width="10"
+                                                        Height="10"
+                                                        Margin="0,-4,-11,0"
+                                                        HorizontalAlignment="Right"
+                                                        VerticalAlignment="Top"
+                                                        Foreground="{DynamicResource WarningBrush}"
+                                                        Kind="Lock"
+                                                        ToolTip="需要登录后使用">
+                                                        <materialDesign:PackIcon.Style>
+                                                            <Style TargetType="materialDesign:PackIcon">
+                                                                <Setter Property="Visibility" Value="Collapsed" />
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding IsLockedForCurrentRole}" Value="True">
+                                                                        <Setter Property="Visibility" Value="Visible" />
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </materialDesign:PackIcon.Style>
+                                                    </materialDesign:PackIcon>
+                                                </Grid>
                                                 <TextBlock
                                                     Margin="0,3,0,0"
                                                     HorizontalAlignment="Center"
@@ -488,9 +537,9 @@
                         HorizontalAlignment="Left"
                         VerticalAlignment="Center"
                         Orientation="Horizontal">
-                        <Border Style="{StaticResource StatusChip}" Margin="0,0,8,0">
+                        <Border Margin="0,0,8,0" Style="{StaticResource StatusChip}">
                             <StackPanel Orientation="Horizontal">
-                                <Ellipse Style="{StaticResource StatusDot}" Fill="{DynamicResource SuccessBrush}" />
+                                <Ellipse Fill="{DynamicResource SuccessBrush}" Style="{StaticResource StatusDot}" />
                                 <TextBlock
                                     FontSize="11"
                                     Foreground="{DynamicResource TextSecondaryBrush}"
@@ -510,6 +559,84 @@
                                     FontSize="11"
                                     Foreground="{DynamicResource TextSecondaryBrush}"
                                     Text="{Binding ThemeDisplayName}" />
+                            </StackPanel>
+                        </Border>
+
+                        <!--  操作提示：点了受限页为什么没进去（以前是静默无反应）  -->
+                        <Border
+                            Margin="8,0,0,0"
+                            Padding="8,2"
+                            Background="{DynamicResource WarningTintBrush}"
+                            CornerRadius="8">
+                            <Border.Style>
+                                <Style TargetType="Border">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsNoticeVisible}" Value="True">
+                                            <Setter Property="Visibility" Value="Visible" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Border.Style>
+                            <StackPanel Orientation="Horizontal">
+                                <materialDesign:PackIcon
+                                    Width="12"
+                                    Height="12"
+                                    Margin="0,0,6,0"
+                                    VerticalAlignment="Center"
+                                    Foreground="{DynamicResource WarningBrush}"
+                                    Kind="LockAlert" />
+                                <TextBlock
+                                    VerticalAlignment="Center"
+                                    FontSize="11"
+                                    Foreground="{DynamicResource TextSecondaryBrush}"
+                                    Text="{Binding StatusNotice}" />
+                            </StackPanel>
+                        </Border>
+
+                        <!--  用户胶囊：权限登录不再占一个导航页，改为从这里用对话框拉起  -->
+                        <Border
+                            Margin="8,0,0,0"
+                            Style="{StaticResource StatusChip}"
+                            ToolTip="点击登录 / 切换用户。未登录时受限页面会带锁角标，点进去会提示先登录">
+                            <StackPanel Orientation="Horizontal">
+                                <materialDesign:PackIcon
+                                    Width="12"
+                                    Height="12"
+                                    Margin="0,0,6,0"
+                                    VerticalAlignment="Center"
+                                    Kind="AccountCircle">
+                                    <materialDesign:PackIcon.Style>
+                                        <Style TargetType="materialDesign:PackIcon">
+                                            <Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsLoggedIn}" Value="True">
+                                                    <Setter Property="Foreground" Value="{DynamicResource SuccessBrush}" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </materialDesign:PackIcon.Style>
+                                </materialDesign:PackIcon>
+                                <Button
+                                    Padding="0"
+                                    Background="Transparent"
+                                    BorderThickness="0"
+                                    Command="{Binding LoginCommand}"
+                                    Content="{Binding CurrentUserText}"
+                                    Cursor="Hand"
+                                    FontSize="11"
+                                    Foreground="{DynamicResource TextSecondaryBrush}" />
+                                <Button
+                                    Margin="6,0,0,0"
+                                    Padding="0"
+                                    Background="Transparent"
+                                    BorderThickness="0"
+                                    Command="{Binding LogoutCommand}"
+                                    Content="注销"
+                                    Cursor="Hand"
+                                    FontSize="11"
+                                    Foreground="{DynamicResource TextMutedBrush}"
+                                    Visibility="{Binding CanLogout, Converter={StaticResource BoolToVisibility}}" />
                             </StackPanel>
                         </Border>
                     </StackPanel>

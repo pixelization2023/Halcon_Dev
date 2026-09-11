@@ -40,24 +40,157 @@
                     Style="{StaticResource ControlButton}" />
                 <Button
                     Margin="0,0,8,0"
+                    Command="{Binding UseSampleImageCommand}"
+                    Content="🧪 合成样张"
+                    Style="{StaticResource ControlButton}"
+                    ToolTip="无需图片文件：生成一张 800×600 合成样张用于验证配方与 PCS 拆分" />
+                <Button
+                    Margin="0,0,8,0"
                     Command="{Binding Load_Hdev}"
                     Content="▶ 加载 Hdev"
                     Style="{StaticResource SuccessButton}" />
                 <Button
+                    Margin="0,0,8,0"
                     Command="{Binding Load_Hdvp}"
                     Content="📦 加载 Hdvp"
                     Style="{StaticResource ControlButton}" />
+                <Button
+                    Command="{Binding RunWholeSheetCommand}"
+                    Content="▦ 整张检测"
+                    Style="{StaticResource PrimaryButton}"
+                    ToolTip="用当前产品的检测配方跑这张整图，按 PCS 拆开逐个出结果（走生产链路同一套服务）" />
             </StackPanel>
         </Grid>
 
-        <!-- 图像显示区 -->
-        <Border Grid.Row="1" Padding="0" Background="{DynamicResource CanvasBrush}"
+        <!-- 图像显示区 + 整张检测结果 -->
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="8" />
+                <ColumnDefinition Width="380" />
+            </Grid.ColumnDefinitions>
+
+            <Border
+                Grid.Column="0"
+                Padding="0"
+                Background="{DynamicResource CanvasBrush}"
                 Style="{StaticResource CardBorder}">
-            <halconView:HalconView
-                x:Name="HalconDisplay"
-                attached:HalconWindowAttachedProperties.WindowReadyCommand="{Binding WindowReadyCommand}"
-                HImage="{Binding CurrentImage, Mode=OneWay}" />
-        </Border>
+                <halconView:HalconView
+                    x:Name="HalconDisplay"
+                    attached:HalconWindowAttachedProperties.WindowReadyCommand="{Binding WindowReadyCommand}"
+                    HImage="{Binding CurrentImage, Mode=OneWay}" />
+            </Border>
+
+            <!--  整张检测结果：一张整图按 PCS 拆开，逐个一行  -->
+            <Border
+                Grid.Column="2"
+                Padding="14"
+                Style="{StaticResource CardBorder}">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <StackPanel Grid.Row="0" Orientation="Horizontal">
+                        <materialDesign:PackIcon
+                            Width="15"
+                            Height="15"
+                            VerticalAlignment="Center"
+                            Foreground="{DynamicResource PrimaryBrush}"
+                            Kind="ViewGridOutline" />
+                        <TextBlock
+                            Margin="8,0,0,0"
+                            FontSize="14"
+                            FontWeight="SemiBold"
+                            Foreground="{DynamicResource TextPrimaryBrush}"
+                            Text="整张 PCS 结果" />
+                    </StackPanel>
+
+                    <TextBlock
+                        Grid.Row="1"
+                        Margin="0,6,0,10"
+                        FontSize="12"
+                        Foreground="{DynamicResource TextSecondaryBrush}"
+                        Text="{Binding SheetSummary}"
+                        TextWrapping="Wrap" />
+
+                    <Grid Grid.Row="2">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                            <ItemsControl ItemsSource="{Binding PcsRows}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid Margin="0,4">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="54" />
+                                                <ColumnDefinition Width="44" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="44" />
+                                            </Grid.ColumnDefinitions>
+
+                                            <TextBlock
+                                                Grid.Column="0"
+                                                VerticalAlignment="Center"
+                                                FontSize="12.5"
+                                                Foreground="{DynamicResource TextPrimaryBrush}"
+                                                Text="{Binding Index, StringFormat='PCS {0}'}" />
+
+                                            <TextBlock
+                                                Grid.Column="1"
+                                                VerticalAlignment="Center"
+                                                FontSize="12"
+                                                FontWeight="SemiBold"
+                                                Foreground="{Binding Color}"
+                                                Text="{Binding Judgment}" />
+
+                                            <TextBlock
+                                                Grid.Column="2"
+                                                Margin="4,0"
+                                                VerticalAlignment="Center"
+                                                FontSize="12"
+                                                Foreground="{DynamicResource TextSecondaryBrush}"
+                                                Text="{Binding Items}"
+                                                TextTrimming="CharacterEllipsis"
+                                                ToolTip="各检测项结果（0=OK，1=NG）" />
+
+                                            <TextBlock
+                                                Grid.Column="3"
+                                                HorizontalAlignment="Right"
+                                                VerticalAlignment="Center"
+                                                FontSize="12"
+                                                Foreground="{DynamicResource TextMutedBrush}"
+                                                Text="{Binding BoxText}"
+                                                ToolTip="NG 框数量" />
+                                        </Grid>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </ScrollViewer>
+
+                        <TextBlock
+                            Margin="0,20,0,0"
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Top"
+                            FontSize="12"
+                            Foreground="{DynamicResource TextMutedBrush}"
+                            Text="先「加载图像」，并确保已在「产品与方案」加载产品，然后点「▦ 整张检测」"
+                            TextAlignment="Center"
+                            TextWrapping="Wrap"
+                            Visibility="{Binding HasNoPcsResult, Converter={StaticResource BoolToVisibility}}" />
+                    </Grid>
+
+                    <TextBlock
+                        Grid.Row="3"
+                        Margin="0,8,0,0"
+                        FontSize="11"
+                        Foreground="{DynamicResource TextMutedBrush}"
+                        Text="检测项：0=OK / 1=NG；末列为 NG 框数。整张一次执行，耗时为合计。"
+                        TextWrapping="Wrap" />
+                </Grid>
+            </Border>
+        </Grid>
 
         <!-- 底部状态 -->
         <Border Grid.Row="2" Margin="0,6,0,0" Padding="14,8" Style="{StaticResource CardBorder}">

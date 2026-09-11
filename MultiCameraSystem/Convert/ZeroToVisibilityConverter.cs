@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
@@ -21,7 +21,10 @@ namespace MultiCameraSystem.Convert
 
         public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
         {
-            throw new NotImplementedException();
+            // 反向转换在语义上无唯一解（用 0 还是 1 表达"可见"没有共识），
+            // 返回 Binding.DoNothing 表示不写回源。旧实现抛 NotImplementedException，
+            // 一旦被 TwoWay 绑定调用就是运行期异常。
+            return Binding.DoNothing;
         }
     }
 
@@ -35,7 +38,7 @@ namespace MultiCameraSystem.Convert
 
         public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
         {
-            throw new NotImplementedException();
+            return Binding.DoNothing;
         }
     }
 }

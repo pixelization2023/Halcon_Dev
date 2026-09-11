@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
@@ -18,7 +18,10 @@ namespace MultiCameraSystem.Convert
 
         public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
         {
-            throw new NotImplementedException();
+            // Visible -> false，其余 -> true。旧实现抛 NotImplementedException。
+            if (value is Visibility visibility)
+                return visibility != Visibility.Visible;
+            return Binding.DoNothing;
         }
     }
 }

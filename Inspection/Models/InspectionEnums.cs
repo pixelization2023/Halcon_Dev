@@ -111,4 +111,63 @@ namespace Inspection.Models
         Ok = 1,
         Ng = 2
     }
+
+    // ==================== 多窗口显示（见 Docs/多窗口显示与检测流程方案.md 第 2 节） ====================
+
+    /// <summary>显示窗口绑定某个 PCS 的方式</summary>
+    public enum DisplayBindMode
+    {
+        /// <summary>按 PCS 序号（PcsInspectionResult.PcsIndex）</summary>
+        ByPcs = 0,
+
+        /// <summary>按上传顺序键（PcsInspectionResult.PcsKey，现场真实位置）</summary>
+        ByKey = 1,
+
+        /// <summary>按来源图片序号（该图片产出的 PCS 依次占位）</summary>
+        ByImage = 2,
+
+        /// <summary>跟随最新完成的 PCS（滚动刷新）</summary>
+        Follow = 3
+    }
+
+    /// <summary>窗口里显示哪种图像</summary>
+    public enum DisplayImageSource
+    {
+        /// <summary>有结果图就用结果图，否则回退原始输入图</summary>
+        Auto = 0,
+
+        /// <summary>强制用 Halcon 输出的结果图</summary>
+        ResultImage = 1,
+
+        /// <summary>强制用原始输入图</summary>
+        OriginalImage = 2
+    }
+
+    /// <summary>窗口只看某种判定的 PCS</summary>
+    public enum DisplayJudgmentFilter
+    {
+        Any = 0,
+        OkOnly = 1,
+        NgOnly = 2
+    }
+
+    /// <summary>窗口缩放方式</summary>
+    public enum DisplayScaleMode
+    {
+        /// <summary>整幅适应窗口（默认）</summary>
+        Fit = 0,
+
+        /// <summary>1:1 显示，可拖动查看</summary>
+        None = 1
+    }
+
+    /// <summary>没有结果时窗口里显示什么</summary>
+    public enum EmptyWindowMode
+    {
+        /// <summary>空窗（黑底）</summary>
+        Empty = 0,
+
+        /// <summary>显示最近一次的原始输入图</summary>
+        OriginalImage = 1
+    }
 }

@@ -1,6 +1,9 @@
 using System.Collections.ObjectModel;
+using System.IO;
+using System.Text;
 using Inspection.Models;
 using Inspection.Services;
+using MVS.Core;
 using Prism.Commands;
 using Prism.Navigation;
 using Serilog;
@@ -21,14 +24,24 @@ namespace Inspection.ViewModels
         private readonly SelfTestService _selfTest;
         private readonly InspectionOrchestrator _orchestrator;
         private readonly ProductRepository _repository;
+        private readonly IFileDialogService _fileDialogs;
+        private readonly IClipboardService _clipboard;
+        private readonly INavigationRequestSink _navigation;
         private readonly ILogger _logger;
 
+        /// <summary>最近一次自检结果（复制/导出报告用；为空说明还没跑过）</summary>
+        private SelfTestReport? _lastReport;
+
         public SelfTestViewModel(SelfTestService selfTest, InspectionOrchestrator orchestrator,
-            ProductRepository repository, ILogger logger)
+            ProductRepository repository, IFileDialogService fileDialogs,
+            IClipboardService clipboard, INavigationRequestSink navigation, ILogger logger)
         {
             _selfTest = selfTest;
             _orchestrator = orchestrator;
             _repository = repository;
+            _fileDialogs = fileDialogs;
+            _clipboard = clipboard;
+            _navigation = navigation;
             _logger = logger.ForContext<SelfTestViewModel>();
 
             RunCommand = new DelegateCommand(async () => await RunAsync());
@@ -36,6 +49,9 @@ namespace Inspection.ViewModels
             LoadDemoCommand = new DelegateCommand(async () => await ExecuteLoadDemoAsync());
             SubmitOkCommand = new DelegateCommand(() => Submit(false));
             SubmitNgCommand = new DelegateCommand(() => Submit(true));
+            CopyReportCommand = new DelegateCommand(ExecuteCopyReport);
+            ExportReportCommand = new DelegateCommand(ExecuteExportReport);
+            GoToTargetCommand = new DelegateCommand<SelfTestItem>(ExecuteGoToTarget);
         }
 
         #region 数据
@@ -74,6 +90,9 @@ namespace Inspection.ViewModels
         public DelegateCommand LoadDemoCommand { get; }
         public DelegateCommand SubmitOkCommand { get; }
         public DelegateCommand SubmitNgCommand { get; }
+        public DelegateCommand CopyReportCommand { get; }
+        public DelegateCommand ExportReportCommand { get; }
+        public DelegateCommand<SelfTestItem> GoToTargetCommand { get; }
 
         private async Task RunAsync()
         {
@@ -81,8 +100,12 @@ namespace Inspection.ViewModels
             StatusText = "自检中…";
             try
             {
-                var report = await _selfTest.RunAsync();
+                // Progress<T> 会回到创建它的同步上下文（UI 线程），所以直接改 StatusText 是安全的。
+                // 自检里 Halcon 那几项首次要十几秒，没有这个回调，界面就只是一句干巴巴的"自检中…"。
+                var progress = new Progress<string>(text => StatusText = text);
+                var report = await _selfTest.RunAsync(progress);
 
+                _lastReport = report;
                 Items.Clear();
                 // 异常项排在最前，方便一眼看到要处理什么
                 foreach (var item in report.Items.OrderBy(i => i.SortOrder)) Items.Add(item);
@@ -151,6 +174,63 @@ namespace Inspection.ViewModels
             StatusText = ok
                 ? $"已投入{(ng ? " NG" : " OK")} 仿真样张，请看「检测主监控台」的结果/图表/日志"
                 : "投入失败（产品未加载或队列已关闭）";
+        }
+
+        /// <summary>把用户带到该项对应的设置页（交给外壳执行，保证侧栏选中态同步）</summary>
+        private void ExecuteGoToTarget(SelfTestItem? item)
+        {
+            if (item?.TargetView is not { Length: > 0 } target) return;
+
+            try
+            {
+                _navigation.RequestNavigate(target);
+                StatusText = $"已跳转到「{item.Name}」对应的设置页";
+            }
+            catch (Exception ex)
+            {
+                StatusText = $"跳转失败：{ex.Message}";
+                _logger.Warning(ex, "自检项跳转失败: {Target}", target);
+            }
+        }
+
+        /// <summary>把最近一次自检报告复制到剪贴板（现场直接粘给工程师，比截图强）</summary>
+        private void ExecuteCopyReport()
+        {
+            if (_lastReport == null)
+            {
+                StatusText = "请先「运行自检」，再复制报告";
+                return;
+            }
+
+            var text = _lastReport.ToText(_orchestrator.Configuration?.ProductName);
+            StatusText = _clipboard.TrySetText(text)
+                ? "自检报告已复制到剪贴板，可直接粘贴发送"
+                : "复制失败：剪贴板正被其他程序占用，请重试";
+        }
+
+        /// <summary>把最近一次自检报告另存为 txt</summary>
+        private void ExecuteExportReport()
+        {
+            if (_lastReport == null)
+            {
+                StatusText = "请先「运行自检」，再导出报告";
+                return;
+            }
+
+            try
+            {
+                var defaultName = $"自检报告_{_lastReport.RunAt:yyyyMMdd_HHmmss}.txt";
+                var path = _fileDialogs.SaveFile("导出自检报告", "文本文件|*.txt", defaultName);
+                if (string.IsNullOrWhiteSpace(path)) return;   // 用户取消
+
+                File.WriteAllText(path, _lastReport.ToText(_orchestrator.Configuration?.ProductName), Encoding.UTF8);
+                StatusText = $"自检报告已保存：{path}";
+            }
+            catch (Exception ex)
+            {
+                StatusText = $"导出失败：{ex.Message}";
+                _logger.Warning(ex, "导出自检报告失败");
+            }
         }
 
         public void OnNavigatedTo(NavigationContext navigationContext)

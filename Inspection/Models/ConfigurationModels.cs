@@ -309,6 +309,31 @@ namespace Inspection.Models
         /// <summary>设备种类</summary>
         public DeviceKind Kind { get; set; } = DeviceKind.HikCamera;
 
+        /// <summary>
+        /// 本相机产出的图片序号（逗号分隔，1 开始；留空 = 自动）。
+        ///
+        /// 为什么必须能显式配：编排器是靠 <c>QueuedFrame.ImageIndex</c> 去匹配配方的
+        /// <see cref="InspectionRecipe.ImageIndexes"/> 的。旧实现用一个**全局自增**计数器给所有相机发号，
+        /// 多相机时序号交叉错位 —— 配方该跑第 2 张图却跑了别的相机的图，
+        /// 表现为"检测跑过了但结果对不上"，且没有任何报错。
+        ///
+        /// 留空时按 <see cref="Order"/> 计算固定区间（见 InspectionHostService 的注释），
+        /// 单相机场景无需配置。
+        /// </summary>
+        public string ImageIndexes { get; set; } = string.Empty;
+
+        /// <summary>解析图片序号集合（1 开始）</summary>
+        public List<int> ParseImageIndexes()
+        {
+            var list = new List<int>();
+            foreach (var part in ImageIndexes.Split(new[] { ',', '，', ';' }, StringSplitOptions.RemoveEmptyEntries))
+            {
+                if (int.TryParse(part.Trim(), out var v) && v > 0)
+                    list.Add(v);
+            }
+            return list;
+        }
+
         public override string ToString() => $"{Name} [{Kind}] {SerialNumber}";
     }
 
@@ -332,6 +357,19 @@ namespace Inspection.Models
 
         /// <summary>单 PCS 的检测项目数（原 "检测项目数"）</summary>
         public int ItemCount { get; set; } = 1;
+
+        /// <summary>
+        /// 本流程的单次执行超时（毫秒）。0 或负数表示用默认值
+        ///（<see cref="Services.HalconInspectionService.DefaultRecipeTimeoutMs"/>，60 秒）。
+        ///
+        /// 为什么需要：Halcon 过程卡住（死循环、等外部信号、内部阻塞）时，
+        /// 旧实现会让检测消费线程永远停在那一行 —— 整线静默停摆，日志里什么都没有。
+        /// </summary>
+        public int TimeoutMs { get; set; }
+
+        /// <summary>实际生效的超时（毫秒）</summary>
+        [JsonIgnore]
+        public int EffectiveTimeoutMs => TimeoutMs > 0 ? TimeoutMs : Services.HalconInspectionService.DefaultRecipeTimeoutMs;
 
         /// <summary>输入图像参数名（HDevelop 过程签名中的图标输入）</summary>
         public string InputImageParam { get; set; } = "Image";
@@ -382,6 +420,127 @@ namespace Inspection.Models
     }
 
     /// <summary>
+    /// 检测主监控台的多窗口显示设置。
+    ///
+    /// 需求来源：现场一张料有多个 PCS，只给一个 Halcon 窗口、且每次都被最新的 PCS 覆盖，
+    /// 操作员看不到"其他 PCS 长什么样"。这里把"窗口个数 / 每行列数 / 每个窗口绑定哪个 PCS /
+    /// 是否叠加 NG 框"全部做成可配置项，随产品方案一起持久化。
+    /// </summary>
+    public class DisplaySettings
+    {
+        /// <summary>是否启用多窗口（false = 沿用单窗口大图）</summary>
+        public bool Enabled { get; set; } = true;
+
+        /// <summary>窗口总个数（1~16；上限是性能取舍：每个窗口一个独立的 Halcon 原生窗口句柄）</summary>
+        public int WindowCount { get; set; } = 4;
+
+        /// <summary>每行窗口数（0 = 自动：≤2 → 1 列，≤6 → 2 列，否则 3 列）</summary>
+        public int Columns { get; set; } = 2;
+
+        /// <summary>单格宽高比（宽/高）</summary>
+        public double TileAspect { get; set; } = 4.0 / 3.0;
+
+        /// <summary>没有结果时窗口里显示什么</summary>
+        public EmptyWindowMode EmptyMode { get; set; } = EmptyWindowMode.Empty;
+
+        /// <summary>每个窗口的绑定规则（长度通常等于 WindowCount）</summary>
+        public List<DisplayWindowSpec> Windows { get; set; } = new();
+
+        /// <summary>窗口数上限</summary>
+        public const int MaxWindowCount = 16;
+
+        /// <summary>
+        /// 规整化：补齐/裁剪窗口列表长度，钳制窗口数与列数。
+        /// 反序列化后由 <see cref="ProductConfiguration.NormalizeDisplay"/> 调用。
+        /// </summary>
+        public void Normalize()
+        {
+            WindowCount = Math.Clamp(WindowCount, 1, MaxWindowCount);
+            if (Columns < 0) Columns = 0;
+            if (Columns > WindowCount) Columns = WindowCount;
+
+            Windows ??= new List<DisplayWindowSpec>();
+
+            // 补齐缺失的窗口定义（默认：第 i 个窗口绑 PCS i）
+            for (int i = Windows.Count; i < WindowCount; i++)
+            {
+                Windows.Add(new DisplayWindowSpec
+                {
+                    Index = i + 1,
+                    Bind = DisplayBindMode.ByPcs,
+                    Target = (i + 1).ToString()
+                });
+            }
+
+            // 裁剪多余项并重排序号
+            if (Windows.Count > WindowCount)
+                Windows.RemoveRange(WindowCount, Windows.Count - WindowCount);
+
+            for (int i = 0; i < Windows.Count; i++)
+            {
+                var w = Windows[i];
+                w.Index = i + 1;
+                if (w.BoxLineWidth < 1) w.BoxLineWidth = 1;
+                if (w.BoxLineWidth > 5) w.BoxLineWidth = 5;
+                if (w.Title == null) w.Title = string.Empty;
+                if (w.Target == null) w.Target = string.Empty;
+                if (w.BoxColor == null) w.BoxColor = string.Empty;
+            }
+        }
+
+        /// <summary>按 <see cref="Columns"/> / <see cref="WindowCount"/> 计算实际列数</summary>
+        public int ResolveColumns()
+        {
+            if (Columns > 0) return Columns;
+            if (WindowCount <= 2) return 1;
+            if (WindowCount <= 6) return 2;
+            return 3;
+        }
+    }
+
+    /// <summary>单个显示窗口的绑定规则</summary>
+    public class DisplayWindowSpec
+    {
+        /// <summary>窗口序号（1 开始，与列表位置一致）</summary>
+        public int Index { get; set; } = 1;
+
+        /// <summary>窗口标题（留空则显示 "PCS {序号}"）</summary>
+        public string Title { get; set; } = string.Empty;
+
+        /// <summary>绑定方式</summary>
+        public DisplayBindMode Bind { get; set; } = DisplayBindMode.ByPcs;
+
+        /// <summary>
+        /// 绑定目标。含义随 <see cref="Bind"/> 变化：
+        /// ByPcs → PCS 序号（如 "1"）；ByKey → 上传顺序键；ByImage → 图片序号；Follow → 忽略。
+        /// </summary>
+        public string Target { get; set; } = string.Empty;
+
+        /// <summary>显示内容</summary>
+        public DisplayImageSource Source { get; set; } = DisplayImageSource.Auto;
+
+        /// <summary>是否叠加 NG 框</summary>
+        public bool ShowNgBoxes { get; set; } = true;
+
+        /// <summary>是否叠加检测项文本</summary>
+        public bool ShowItemText { get; set; } = true;
+
+        /// <summary>只显示指定判定的 PCS</summary>
+        public DisplayJudgmentFilter Filter { get; set; } = DisplayJudgmentFilter.Any;
+
+        /// <summary>框线颜色（#RRGGBB；留空表示用主题的红色/错误色）</summary>
+        public string BoxColor { get; set; } = string.Empty;
+
+        /// <summary>框线宽（px，1~5）</summary>
+        public int BoxLineWidth { get; set; } = 2;
+
+        /// <summary>缩放方式</summary>
+        public DisplayScaleMode Scale { get; set; } = DisplayScaleMode.Fit;
+
+        public override string ToString() => $"[{Index}] {Bind}:{Target}";
+    }
+
+    /// <summary>
     /// 产品方案配置（顶层）。
     /// 迁移自 窗体.序列化类.SerLion —— 原使用 BinaryFormatter 写入 *.asol，
     /// 现改为 UTF-8 JSON，避免二进制序列化在 .NET 9 下不可用且更易审阅。
@@ -389,7 +548,13 @@ namespace Inspection.Models
     public class ProductConfiguration
     {
         /// <summary>配置结构版本，便于后续兼容升级</summary>
-        public int SchemaVersion { get; set; } = 2;
+        /// <summary>
+        /// 当前配置架构版本。加载到更低版本的产品配置时，保存一次即可把结构升级上来
+        /// （自检会把这个差异报出来，避免"旧配置缺字段"被当成玄学问题）。
+        /// </summary>
+        public const int CurrentSchemaVersion = 3;
+
+        public int SchemaVersion { get; set; } = CurrentSchemaVersion;
 
         /// <summary>产品名称（原 SolName）</summary>
         public string ProductName { get; set; } = string.Empty;
@@ -451,7 +616,18 @@ namespace Inspection.Models
         /// <summary>相机绑定（原 globaljob）</summary>
         public List<CameraBinding> Cameras { get; set; } = new();
 
+        /// <summary>检测主监控台的多窗口显示设置（v3 新增）</summary>
+        public DisplaySettings Display { get; set; } = new();
+
         // ------------------------------------------------------------------
+
+        /// <summary>
+        /// 规整化显示设置（补齐窗口定义、钳制范围）。
+        /// 由 <see cref="ProductRepository.Load"/> 在反序列化后调用 ——
+        /// 老配置（v2，没有 Display 字段）反序列化后 Display 会是默认值，
+        /// 这里统一补齐窗口列表，避免界面拿到"窗口数 4 但窗口定义 0 条"的错位状态。
+        /// </summary>
+        public void NormalizeDisplay() => Display?.Normalize();
 
         /// <summary>取得分组开关（不存在时创建默认值）</summary>
         public FeatureToggleSet GetToggles(string group)

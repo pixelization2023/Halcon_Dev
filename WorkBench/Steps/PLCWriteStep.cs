@@ -10,16 +10,29 @@ namespace WorkBench.Steps
         private readonly Dictionary<string, object> _signals;
         private readonly ILogger _logger;
 
-        public PLCWriteStep(Dictionary<string, object> signals, TimeSpan timeout)
+        /// <summary>
+        /// 注入的 PLC 通信器（**必需**依赖）。
+        ///
+        /// 解耦要点：依赖通过构造函数显式传入。旧实现在 ExecuteAsync 里走
+        /// <c>MVS.Core.AppContainer</c> 服务定位器取 —— 那样依赖关系编译期不可见、
+        /// 只能等执行到这一步才发现缺失，也无法在测试里替换。
+        /// 改成必需参数后，注册期就能发现缺失（容器解析失败会直接报错，而不是静默跳过步骤）。
+        /// </summary>
+        private readonly IPLCCommunicator _plcCommunicator;
+
+        public PLCWriteStep(Dictionary<string, object> signals, TimeSpan timeout, IPLCCommunicator plcCommunicator)
             : base("PLC写入", StepType.PLCWrite, timeout)
         {
             _signals = signals;
+            _plcCommunicator = plcCommunicator
+                ?? throw new ArgumentNullException(nameof(plcCommunicator),
+                    "PLCWriteStep 需要 IPLCCommunicator；请由组合根注入（WorkBenchViewModel 会从容器取）。");
             _logger = Serilog.Log.Logger.ForContext<PLCWriteStep>();
         }
 
-        public override async Task<bool> ValidateAsync(IInspectionContext context)
+        public override Task<bool> ValidateAsync(IInspectionContext context)
         {
-            return _signals.Count > 0;
+            return Task.FromResult(_signals.Count > 0);
         }
 
         public override async Task<StepResult> ExecuteAsync(IInspectionContext context, CancellationToken ct)
@@ -28,7 +41,7 @@ namespace WorkBench.Steps
 
             try
             {
-                var plc = MVS.Core.AppContainer.Resolve<IPLCCommunicator>();
+                var plc = _plcCommunicator;
 
                 if (!plc.IsConnected)
                 {

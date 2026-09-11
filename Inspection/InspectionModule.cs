@@ -29,13 +29,22 @@ namespace Inspection
             containerRegistry.RegisterSingleton<InspectionOrchestrator>();
             containerRegistry.RegisterSingleton<SelfTestService>();
 
+            // 把 Halcon 过程接口暴露给 WorkBench（工作台的「从过程接口导入」按钮用）。
+            // 契约定义在共享内核 MVS.Core，因此不引入任何新的工程引用。
+            containerRegistry.RegisterSingleton<MVS.Core.IVisionInterfaceProvider, VisionInterfaceProvider>();
+
             // ---- 视图导航 ----
             containerRegistry.RegisterForNavigation<DashboardView>();
             containerRegistry.RegisterForNavigation<ProductView>();
             containerRegistry.RegisterForNavigation<InspectionConfigView>();
             containerRegistry.RegisterForNavigation<SystemSettingsView>();
-            containerRegistry.RegisterForNavigation<LoginView>();
             containerRegistry.RegisterForNavigation<SelfTestView>();
+
+            // ---- 对话框 ----
+            // 权限登录不再是导航页，而是由状态栏的「用户胶囊」通过 IDialogService 拉起的对话框。
+            // 注册名 "LoginDialog" 是外壳（MainWindowViewModel）唯一需要知道的字符串，
+            // 这样 MultiCameraSystem 不必反向依赖 Inspection 的视图类型。
+            containerRegistry.RegisterDialog<LoginDialog>("LoginDialog");
         }
 
         public void OnInitialized(IContainerProvider containerProvider)

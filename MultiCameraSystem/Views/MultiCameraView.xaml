@@ -28,10 +28,26 @@
             </Grid.ColumnDefinitions>
             <StackPanel>
                 <TextBlock Style="{StaticResource PageTitle}" Text="多相机概览" />
-                <TextBlock
-                    Margin="0,6,0,0"
-                    Style="{StaticResource MutedText}"
-                    Text="{Binding Cameras.Count, StringFormat=已发现 {0} 台设备}" />
+                <StackPanel Margin="0,6,0,0" Orientation="Horizontal">
+                    <!--  SDK 状态灯：直接反映 Initialize() 是否成功，失败时右侧文本带出原因  -->
+                    <Ellipse
+                        Width="8"
+                        Height="8"
+                        Margin="0,0,8,0"
+                        VerticalAlignment="Center">
+                        <Ellipse.Style>
+                            <Style TargetType="Ellipse">
+                                <Setter Property="Fill" Value="{DynamicResource ErrorBrush}" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsSdkReady}" Value="True">
+                                        <Setter Property="Fill" Value="{DynamicResource SuccessBrush}" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Ellipse.Style>
+                    </Ellipse>
+                    <TextBlock Style="{StaticResource MutedText}" Text="{Binding SdkStatusText}" TextWrapping="Wrap" />
+                </StackPanel>
             </StackPanel>
 
             <Button
@@ -131,10 +147,14 @@
                                             <Style TargetType="Ellipse">
                                                 <Setter Property="Fill" Value="{DynamicResource DisconnectedBrush}" />
                                                 <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding Status}" Value="true">
+                                                    <!--  CameraInfo.Status 是 bool。WPF 的 DataTrigger 比较的是
+                                                          TypeConverter 转换后的类型，写 Value="True"（大写）才与 bool 相等；
+                                                          旧实现写成小写 "true"，与 string 比较，永远匹配不上，
+                                                          结果就是"设备在线也一直显示离线颜色"。  -->
+                                                    <DataTrigger Binding="{Binding Status}" Value="True">
                                                         <Setter Property="Fill" Value="{DynamicResource ConnectedBrush}" />
                                                     </DataTrigger>
-                                                    <DataTrigger Binding="{Binding Status}" Value="false">
+                                                    <DataTrigger Binding="{Binding Status}" Value="False">
                                                         <Setter Property="Fill" Value="{DynamicResource DisconnectedBrush}" />
                                                     </DataTrigger>
                                                 </Style.Triggers>

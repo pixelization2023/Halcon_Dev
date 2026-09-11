@@ -226,13 +226,18 @@
                                 Height="15"
                                 VerticalAlignment="Center"
                                 Foreground="{DynamicResource PrimaryBrush}"
-                                Kind="ImageOutline" />
+                                Kind="ImageMultipleOutline" />
                             <TextBlock
                                 Margin="8,0,0,0"
                                 FontSize="14"
                                 FontWeight="SemiBold"
                                 Foreground="{DynamicResource TextPrimaryBrush}"
                                 Text="实时图像" />
+                            <TextBlock
+                                Margin="8,0,0,0"
+                                VerticalAlignment="Center"
+                                Style="{StaticResource MutedText}"
+                                Text="{Binding DisplayWindowCount, StringFormat={}{0} 个窗口}" />
                         </StackPanel>
                         <TextBlock
                             HorizontalAlignment="Right"
@@ -241,7 +246,127 @@
                             Text="{Binding LaserCode}" />
                     </Grid>
 
-                    <halcon:HalconView Height="380" HImage="{Binding CurrentImage}" />
+                    <!--
+                        多窗口显示：窗口个数 / 每行列数 / 每格绑定哪个 PCS 都来自产品方案的 Display 设置，
+                        在「检测配置」页里改。旧的单窗口写法（一个 HalconView 绑 CurrentImage）
+                        只能看到最后一个 PCS，这是现场反馈的核心问题。
+                    -->
+                    <ItemsControl ItemsSource="{Binding DisplayWindows}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <UniformGrid Columns="{Binding DataContext.DisplayColumns, RelativeSource={RelativeSource AncestorType=ItemsControl}}" />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border
+                                    Margin="3"
+                                    Background="{DynamicResource CanvasBrush}"
+                                    BorderBrush="{DynamicResource CardBorderBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="8">
+                                    <Grid>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="*" />
+                                            <RowDefinition Height="Auto" />
+                                        </Grid.RowDefinitions>
+
+                                        <!--  标题行：窗口标题 + 判定胶囊  -->
+                                        <Grid Grid.Row="0" Margin="8,6,8,4">
+                                            <TextBlock
+                                                VerticalAlignment="Center"
+                                                FontSize="11.5"
+                                                FontWeight="Medium"
+                                                Foreground="{DynamicResource TextPrimaryBrush}"
+                                                Text="{Binding Title}" />
+                                            <Border
+                                                HorizontalAlignment="Right"
+                                                Padding="6,1"
+                                                CornerRadius="8">
+                                                <Border.Style>
+                                                    <Style TargetType="Border">
+                                                        <Setter Property="Background" Value="{DynamicResource TextMutedBrush}" />
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding IsOk}" Value="True">
+                                                                <Setter Property="Background" Value="{DynamicResource SuccessBrush}" />
+                                                            </DataTrigger>
+                                                            <DataTrigger Binding="{Binding IsNg}" Value="True">
+                                                                <Setter Property="Background" Value="{DynamicResource ErrorBrush}" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Border.Style>
+                                                <TextBlock
+                                                    FontSize="10"
+                                                    FontWeight="Bold"
+                                                    Foreground="White"
+                                                    Text="{Binding JudgmentText}" />
+                                            </Border>
+                                        </Grid>
+
+                                        <!--  图像区：HalconView + 空态提示  -->
+                                        <Grid Grid.Row="1" MinHeight="150">
+                                            <halcon:HalconView
+                                                HImage="{Binding Image, Mode=OneWay}"
+                                                Overlays="{Binding Overlays}" />
+                                            <Border
+                                                Background="{DynamicResource ScrimBrush}"
+                                                CornerRadius="8">
+                                                <Border.Style>
+                                                    <Style TargetType="Border">
+                                                        <Setter Property="Visibility" Value="Collapsed" />
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding IsEmpty}" Value="True">
+                                                                <Setter Property="Visibility" Value="Visible" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Border.Style>
+                                                <StackPanel
+                                                    HorizontalAlignment="Center"
+                                                    VerticalAlignment="Center">
+                                                    <materialDesign:PackIcon
+                                                        Width="26"
+                                                        Height="26"
+                                                        HorizontalAlignment="Center"
+                                                        Foreground="{DynamicResource TextMutedBrush}"
+                                                        Kind="ImageOffOutline" />
+                                                    <TextBlock
+                                                        Margin="0,6,0,0"
+                                                        HorizontalAlignment="Center"
+                                                        FontSize="11"
+                                                        Foreground="{DynamicResource TextMutedBrush}"
+                                                        Text="等待该 PCS 图像…" />
+                                                </StackPanel>
+                                            </Border>
+                                        </Grid>
+
+                                        <!--  明细行  -->
+                                        <TextBlock
+                                            Grid.Row="2"
+                                            Margin="8,4,8,6"
+                                            FontFamily="Consolas"
+                                            FontSize="10.5"
+                                            Foreground="{DynamicResource TextMutedBrush}"
+                                            Text="{Binding DetailText}"
+                                            TextTrimming="CharacterEllipsis" />
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
+                    <!--  未配置任何窗口时的兜底提示  -->
+                    <Border
+                        Padding="20"
+                        Style="{StaticResource InnerCard}"
+                        Visibility="{Binding HasNoDisplayWindows, Converter={StaticResource BoolToVisibility}}">
+                        <TextBlock
+                            HorizontalAlignment="Center"
+                            Style="{StaticResource MutedText}"
+                            Text="当前方案没有配置显示窗口，请到「检测配置 → 图像显示」里设置窗口个数。" />
+                    </Border>
                 </StackPanel>
             </Border>
 

@@ -28,7 +28,10 @@ namespace MultiCameraSystem.Services
         private readonly Dictionary<string, CameraDevice> _boundCameras = new(StringComparer.OrdinalIgnoreCase);
         private readonly object _sync = new();
 
-        private int _frameIndex;
+        // 图片序号规划：每台相机各走各的序号，避免多相机共用一个全局自增计数器而串号。
+        // 具体规则与"为什么会静默出错"见 CameraFrameIndexPlanner 的类注释。
+        private readonly CameraFrameIndexPlanner _frameIndexPlanner;
+
         private bool _disposed;
 
         public InspectionHostService(ICameraService cameraService, InspectionOrchestrator orchestrator,
@@ -38,6 +41,7 @@ namespace MultiCameraSystem.Services
             _orchestrator = orchestrator;
             _plc = plc;
             _logger = logger.ForContext<InspectionHostService>();
+            _frameIndexPlanner = new CameraFrameIndexPlanner(logger);
 
             _orchestrator.CameraTriggerRequested += OnCameraTriggerRequested;
             _orchestrator.SoftwareTriggerRequested += OnSoftwareTriggerRequested;
@@ -67,7 +71,7 @@ namespace MultiCameraSystem.Services
             }
 
             UnbindCameras();
-            _frameIndex = 0;
+            _frameIndexPlanner.Configure(cfg);
 
             foreach (var binding in cfg.Cameras)
             {
@@ -92,7 +96,11 @@ namespace MultiCameraSystem.Services
                     lock (_sync)
                         _boundCameras[binding.Name] = camera;
 
-                    _logger.Information("相机已绑定并开始采集: {Name} ({Sn})", binding.Name, binding.SerialNumber);
+                    var plan = _frameIndexPlanner.Plans.TryGetValue(binding.SerialNumber, out var p)
+                        ? string.Join(",", p)
+                        : "（未规划）";
+                    _logger.Information("相机已绑定并开始采集: {Name} ({Sn})，图片序号 [{Plan}]",
+                        binding.Name, binding.SerialNumber, plan);
                 }
                 catch (Exception ex)
                 {
@@ -120,6 +128,7 @@ namespace MultiCameraSystem.Services
                 }
 
                 _boundCameras.Clear();
+                _frameIndexPlanner.ResetCursors();
             }
         }
 
@@ -200,33 +209,56 @@ namespace MultiCameraSystem.Services
                 var image = e.FrameOut?.Image;
                 if (image == null) return;
 
-                var hobject = HalconImageConvert.BitmapToHObject(image.ToBitmap());
+                var camera = sender as CameraDevice;
+                var serialNumber = camera?.Info.SerialNumber ?? string.Empty;
 
-                var index = Interlocked.Increment(ref _frameIndex);
-                if (cfg.ImageTotal > 0 && index > cfg.ImageTotal)
+                // 每台相机走自己的图片序号（旧实现是全局自增，多相机会串号，见 CameraFrameIndexPlanner）
+                var index = _frameIndexPlanner.Next(serialNumber, Math.Max(1, cfg.ImageTotal), out var startedNewSheet);
+
+                if (startedNewSheet)
                 {
-                    // 超过一张料的图片总数：自动开新的一张（原实现依赖 PLC 复位信号清数据）
-                    Interlocked.Exchange(ref _frameIndex, 1);
-                    index = 1;
+                    // 上一张料已拍满：清掉它的汇总数据，从新的一张料重新计数
                     _orchestrator.ClearSheet();
-                    _logger.Information("图片数超过 {Total}，自动开始新一张", cfg.ImageTotal);
+                    _logger.Information("相机 {Camera} 已拍满本张料（每张 {Total} 张图），自动开始新的一张",
+                        ResolveLogicalName(serialNumber), cfg.ImageTotal);
                 }
+
+                var hobject = HalconImageConvert.BitmapToHObject(image.ToBitmap());
 
                 var frame = new QueuedFrame
                 {
                     ImageIndex = index,
                     Image = hobject,
                     PhotoName = DateTime.Now.ToString("yyyy-MM-dd-H-mm-ss-ffff"),
-                    CameraName = (sender as CameraDevice)?.Info.SerialNumber ?? string.Empty
+                    // 逻辑名优先（相机绑定里的 Name），取不到再退化为序列号 ——
+                    // 界面与日志里显示序列号对现场没什么意义。
+                    CameraName = ResolveLogicalName(serialNumber)
                 };
 
                 if (!_orchestrator.SubmitFrame(frame))
-                    _logger.Warning("图像入队失败: 序号 {Index}", index);
+                    _logger.Warning("图像入队失败: 相机 {Camera} 图片序号 {Index}", frame.CameraName, index);
             }
             catch (Exception ex)
             {
                 _logger.Error(ex, "处理相机取流帧失败");
             }
+        }
+
+        /// <summary>序列号 → 相机绑定里的逻辑名</summary>
+        private string ResolveLogicalName(string serialNumber)
+        {
+            if (string.IsNullOrWhiteSpace(serialNumber)) return string.Empty;
+
+            lock (_sync)
+            {
+                foreach (var kv in _boundCameras)
+                {
+                    if (string.Equals(kv.Value.Info.SerialNumber, serialNumber, StringComparison.OrdinalIgnoreCase))
+                        return kv.Key;
+                }
+            }
+
+            return serialNumber;
         }
 
         public void Dispose()

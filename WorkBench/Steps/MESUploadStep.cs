@@ -10,15 +10,26 @@ namespace WorkBench.Steps
     {
         private readonly ILogger _logger;
 
-        public MESUploadStep(TimeSpan timeout)
+        /// <summary>
+        /// 注入的 MES 连接器（**必需**依赖）。
+        ///
+        /// 解耦要点：与 <see cref="PLCWriteStep"/> 同理 —— 依赖显式传入，
+        /// 不再在 ExecuteAsync 里走 <c>MVS.Core.AppContainer</c> 服务定位器。
+        /// </summary>
+        private readonly IMESConnector _mesConnector;
+
+        public MESUploadStep(TimeSpan timeout, IMESConnector mesConnector)
             : base("MES上传", StepType.MESUpload, timeout)
         {
+            _mesConnector = mesConnector
+                ?? throw new ArgumentNullException(nameof(mesConnector),
+                    "MESUploadStep 需要 IMESConnector；请由组合根注入（WorkBenchViewModel 会从容器取）。");
             _logger = Serilog.Log.Logger.ForContext<MESUploadStep>();
         }
 
-        public override async Task<bool> ValidateAsync(IInspectionContext context)
+        public override Task<bool> ValidateAsync(IInspectionContext context)
         {
-            return !string.IsNullOrEmpty(context.ProductBarcode);
+            return Task.FromResult(!string.IsNullOrEmpty(context.ProductBarcode));
         }
 
         public override async Task<StepResult> ExecuteAsync(IInspectionContext context, CancellationToken ct)
@@ -27,7 +38,7 @@ namespace WorkBench.Steps
 
             try
             {
-                var mes = MVS.Core.AppContainer.Resolve<IMESConnector>();
+                var mes = _mesConnector;
 
                 if (!mes.IsConnected)
                 {

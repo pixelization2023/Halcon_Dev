@@ -81,11 +81,19 @@ namespace Inspection.ViewModels
         private readonly TraceSocketService _trace;
         private readonly ProductRepository _repository;
         private readonly UserSessionService _session;
+
+        /// <summary>
+        /// 文件夹选择服务。
+        /// 解耦要点：不再直接 <c>new OpenFolderDialog()</c> —— ViewModel 不依赖 UI 类型，
+        /// 且测试里可以替换（见 <see cref="MVS.Core.IFileDialogService"/>）。
+        /// </summary>
+        private readonly MVS.Core.IFileDialogService _fileDialogs;
+
         private readonly ILogger _logger;
 
         public SystemSettingsViewModel(InspectionOrchestrator orchestrator, InspectionResultStore store,
             PlcIoService plc, TraceSocketService trace, ProductRepository repository,
-            UserSessionService session, ILogger logger)
+            UserSessionService session, MVS.Core.IFileDialogService fileDialogs, ILogger logger)
         {
             _orchestrator = orchestrator;
             _store = store;
@@ -93,6 +101,7 @@ namespace Inspection.ViewModels
             _trace = trace;
             _repository = repository;
             _session = session;
+            _fileDialogs = fileDialogs;
             _logger = logger.ForContext<SystemSettingsViewModel>();
 
             SaveCommand = new DelegateCommand(ExecuteSave);
@@ -351,13 +360,12 @@ namespace Inspection.ViewModels
             RaisePropertyChanged(nameof(ImageLocation));
         }
 
-        private static string BrowseFolder(string current)
-        {
-            var dialog = new OpenFolderDialog { Title = "选择文件夹", Multiselect = false };
-            if (!string.IsNullOrWhiteSpace(current)) dialog.InitialDirectory = current;
-
-            return dialog.ShowDialog() == true ? dialog.FolderName : current;
-        }
+        /// <summary>
+        /// 选择文件夹（经 <see cref="MVS.Core.IFileDialogService"/>，不再直接 new OpenFolderDialog）。
+        /// 用户取消时返回原值。
+        /// </summary>
+        private string BrowseFolder(string current)
+            => _fileDialogs.PickFolder("选择文件夹", current) ?? current;
 
         /// <summary>重新展开点位表</summary>
         private void ReloadPlcPoints()

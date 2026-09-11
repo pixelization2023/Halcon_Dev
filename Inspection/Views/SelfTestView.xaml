@@ -100,11 +100,24 @@
                             Foreground="{DynamicResource TextPrimaryBrush}"
                             Text="环境自检" />
                     </StackPanel>
-                    <TextBlock
-                        HorizontalAlignment="Right"
-                        VerticalAlignment="Center"
-                        Style="{StaticResource DataValue}"
-                        Text="{Binding SummaryText}" />
+                    <StackPanel HorizontalAlignment="Right" Orientation="Horizontal">
+                        <TextBlock
+                            Margin="0,0,12,0"
+                            VerticalAlignment="Center"
+                            Style="{StaticResource DataValue}"
+                            Text="{Binding SummaryText}" />
+                        <Button
+                            Margin="0,0,8,0"
+                            Command="{Binding CopyReportCommand}"
+                            Content="复制报告"
+                            Style="{StaticResource ControlButton}"
+                            ToolTip="把最近一次自检结果复制到剪贴板（可直接粘贴发给工程师）" />
+                        <Button
+                            Command="{Binding ExportReportCommand}"
+                            Content="导出报告"
+                            Style="{StaticResource ControlButton}"
+                            ToolTip="把最近一次自检结果另存为 txt" />
+                    </StackPanel>
                 </Grid>
 
                 <ItemsControl ItemsSource="{Binding Items}">
@@ -160,6 +173,21 @@
                                     Text="{Binding HintText}"
                                     TextWrapping="Wrap"
                                     Visibility="{Binding HasHint, Converter={StaticResource BoolToVisibility}}" />
+
+                                <!--
+                                    一键跳到该项对应的设置页。
+                                    交给外壳的 INavigationRequestSink 执行（不是直接 RequestNavigate），
+                                    这样侧栏选中态会一起同步，用户不会觉得"点错了"。
+                                    没有对应页的项（纯环境问题）不显示这个按钮。
+                                -->
+                                <Button
+                                    Margin="170,6,0,0"
+                                    HorizontalAlignment="Left"
+                                    Command="{Binding DataContext.GoToTargetCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                    CommandParameter="{Binding}"
+                                    Content="去处理 →"
+                                    Style="{StaticResource ControlButton}"
+                                    Visibility="{Binding HasTarget, Converter={StaticResource BoolToVisibility}}" />
                             </StackPanel>
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>

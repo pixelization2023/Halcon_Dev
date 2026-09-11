@@ -34,6 +34,7 @@ namespace Inspection.ViewModels
             SaveConfigCommand = new DelegateCommand(ExecuteSaveConfig);
             AddCameraCommand = new DelegateCommand(ExecuteAddCamera);
             RemoveCameraCommand = new DelegateCommand<CameraBinding>(ExecuteRemoveCamera);
+            ApplyScaleCommand = new DelegateCommand(ExecuteApplyScale);
         }
 
         #region 集合
@@ -42,6 +43,16 @@ namespace Inspection.ViewModels
         public ObservableCollection<string> Solutions { get; } = new();
         public ObservableCollection<CameraBinding> Cameras { get; } = new();
         public ObservableCollection<string> Issues { get; } = new();
+
+        /// <summary>相机绑定表「种类」列的下拉项。
+        /// 之前这一列是自由文本，手打错一个字符（例如写成"海康像机"）就会在运行期匹配不到设备，
+        /// 且没有任何提示 —— 改为枚举下拉从根上避免。</summary>
+        public IReadOnlyList<DeviceKind> DeviceKinds { get; } = new[]
+        {
+            DeviceKind.HikCamera,
+            DeviceKind.DahengCamera,
+            DeviceKind.HikCodeReader
+        };
 
         #endregion
 
@@ -81,6 +92,51 @@ namespace Inspection.ViewModels
 
         public IReadOnlyList<string> CameraKinds { get; } = new[] { "海康相机", "大恒相机", "海康扫码枪" };
 
+        // ---- 制品规模（原 PicNum / UploadNum / CodeNum）----
+        // 这三个字段决定配方校验与上传顺序，以前界面上完全没有入口，只能手改 产品名.json。
+
+        /// <summary>相机拍摄图片总数（原 PicNum）</summary>
+        public int ImageTotal
+        {
+            get => _orchestrator.Configuration?.ImageTotal ?? 1;
+            set
+            {
+                var cfg = _orchestrator.Configuration;
+                if (cfg == null) return;
+                if (cfg.ImageTotal == value) return;
+                cfg.ImageTotal = Math.Max(1, value);
+                RaisePropertyChanged();
+            }
+        }
+
+        /// <summary>整张 PCS 总数（原 UploadNum）</summary>
+        public int SheetPcsTotal
+        {
+            get => _orchestrator.Configuration?.SheetPcsTotal ?? 1;
+            set
+            {
+                var cfg = _orchestrator.Configuration;
+                if (cfg == null) return;
+                if (cfg.SheetPcsTotal == value) return;
+                cfg.SheetPcsTotal = Math.Max(1, value);
+                RaisePropertyChanged();
+            }
+        }
+
+        /// <summary>二维码个数（原 CodeNum）</summary>
+        public int CodeCount
+        {
+            get => _orchestrator.Configuration?.CodeCount ?? 1;
+            set
+            {
+                var cfg = _orchestrator.Configuration;
+                if (cfg == null) return;
+                if (cfg.CodeCount == value) return;
+                cfg.CodeCount = Math.Max(1, value);
+                RaisePropertyChanged();
+            }
+        }
+
         private string _statusText = "就绪";
         public string StatusText
         {
@@ -109,6 +165,7 @@ namespace Inspection.ViewModels
         public DelegateCommand SaveConfigCommand { get; }
         public DelegateCommand AddCameraCommand { get; }
         public DelegateCommand<CameraBinding> RemoveCameraCommand { get; }
+        public DelegateCommand ApplyScaleCommand { get; }
 
         private void ExecuteCreateProduct()
         {
@@ -146,6 +203,8 @@ namespace Inspection.ViewModels
             if (Solutions.Count > 0 && string.IsNullOrEmpty(SelectedSolution))
                 SelectedSolution = Solutions[0];
 
+            // 注意：这里只是"预览已选中产品的配置"，并不加载到编排器（那是「加载产品」按钮的职责），
+            // 所以制品规模三个输入框此时是不可编辑的空值状态。
             var cfg = _repository.Load(SelectedProduct);
             Cameras.Clear();
             if (cfg != null)
@@ -153,6 +212,7 @@ namespace Inspection.ViewModels
                 foreach (var cam in cfg.Cameras) Cameras.Add(cam);
                 RefreshIssues(cfg);
             }
+            RaiseScaleChanged();
         }
 
         private async Task ExecuteLoadProductAsync()
@@ -178,6 +238,7 @@ namespace Inspection.ViewModels
                 Cameras.Clear();
                 foreach (var cam in cfg.Cameras) Cameras.Add(cam);
                 RefreshIssues(cfg);
+                RaiseScaleChanged();
 
                 StatusText = $"产品已加载：{SelectedProduct}";
             }
@@ -251,6 +312,33 @@ namespace Inspection.ViewModels
             StatusText = $"已移除 {binding.Name}";
         }
 
+        /// <summary>
+        /// 应用制品规模并立刻校验。
+        /// 上传顺序（UploadOrder）的长度必须与整张 PCS 数一致，否则上传阶段的绑定会错位，
+        /// 这里在改完规模后按 PCS 总数把上传顺序补全，并给出校验清单。
+        /// </summary>
+        private void ExecuteApplyScale()
+        {
+            var cfg = _orchestrator.Configuration;
+            if (cfg == null)
+            {
+                StatusText = "请先加载产品";
+                return;
+            }
+
+            if (cfg.UploadOrder.Count != cfg.SheetPcsTotal)
+            {
+                var previous = cfg.UploadOrder.Count;
+                cfg.UploadOrder = Enumerable.Range(1, Math.Max(1, cfg.SheetPcsTotal))
+                    .Select(i => i.ToString()).ToList();
+                _logger.Information("上传顺序按 PCS 总数补全: {Old} -> {New}", previous, cfg.UploadOrder.Count);
+            }
+
+            RefreshIssues(cfg);
+            StatusText = $"制品规模已应用：图片 {cfg.ImageTotal} 张 / PCS {cfg.SheetPcsTotal} 个 / 二维码 {cfg.CodeCount} 个" +
+                         (Issues.Count > 0 ? $"（{Issues.Count} 项待处理）" : "（校验通过）");
+        }
+
         #endregion
 
         #region 辅助
@@ -273,6 +361,14 @@ namespace Inspection.ViewModels
         {
             Issues.Clear();
             foreach (var issue in cfg.Validate()) Issues.Add(issue);
+        }
+
+        /// <summary>制品规模三个输入框的显示值来自 Configuration，配置变化后要通知一次</summary>
+        private void RaiseScaleChanged()
+        {
+            RaisePropertyChanged(nameof(ImageTotal));
+            RaisePropertyChanged(nameof(SheetPcsTotal));
+            RaisePropertyChanged(nameof(CodeCount));
         }
 
         public void LoadProducts()

@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
@@ -12,14 +12,12 @@
 	<ItemGroup>
 		<PackageReference Include="LiveChartsCore.SkiaSharpView.WPF" Version="2.0.5" />
     <PackageReference Include="SkiaSharp" Version="3.119.0" />
-		<PackageReference Include="MaterialDesignColors" Version="5.3.1" />
-		<PackageReference Include="MaterialDesignThemes" Version="5.3.1" />
-		<PackageReference Include="MaterialDesignThemes.Wpf" Version="1.0.1" />
+		<PackageReference Include="MaterialDesignColors" Version="5.3.2" />
+		<PackageReference Include="MaterialDesignThemes" Version="5.3.2" />
 		<PackageReference Include="Prism.DryIoc" Version="9.0.537" />
 		<PackageReference Include="Serilog" Version="4.3.1" />
 		<PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
 		<PackageReference Include="System.Drawing.Common" Version="10.0.5" />
-		<PackageReference Include="System.Reactive" Version="6.1.0" />
 	</ItemGroup>
 
 	<ItemGroup>

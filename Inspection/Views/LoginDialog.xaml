@@ -1,0 +1,112 @@
+<UserControl
+    x:Class="Inspection.Views.LoginDialog"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+    xmlns:prism="http://prismlibrary.com/"
+    Width="440"
+    prism:ViewModelLocator.AutoWireViewModel="True">
+
+    <!--
+        权限登录对话框。
+        由 MainWindow 状态栏的「用户胶囊」通过 IDialogService 拉起（见 MainWindowViewModel.LoginCommand）。
+        与原来的 LoginView 页面相比：
+          - 不再占用一个导航页 / 顶部主菜单项；
+          - 密码改为 PasswordBox（原来是明文 TextBox，屏幕上看得到密码）；
+          - 账号下拉绑定到 UserSessionService.AccountNames（唯一真源）。
+    -->
+
+    <Border Style="{StaticResource CardBorder}">
+        <StackPanel>
+            <StackPanel Margin="0,0,0,16" Orientation="Horizontal">
+                <materialDesign:PackIcon
+                    Width="22"
+                    Height="22"
+                    VerticalAlignment="Center"
+                    Foreground="{DynamicResource PrimaryBrush}"
+                    Kind="AccountKey" />
+                <TextBlock
+                    Margin="10,0,0,0"
+                    VerticalAlignment="Center"
+                    Style="{StaticResource SectionTitle}"
+                    Text="权限登录" />
+            </StackPanel>
+
+            <TextBlock Style="{StaticResource MutedText}" Text="账号" />
+            <ComboBox
+                Margin="0,6,0,14"
+                ItemsSource="{Binding Accounts}"
+                SelectedItem="{Binding UserName, Mode=TwoWay}" />
+
+            <TextBlock Style="{StaticResource MutedText}" Text="密码" />
+            <PasswordBox
+                x:Name="PasswordInput"
+                Margin="0,6,0,18"
+                Padding="10,8"
+                Background="{DynamicResource SurfaceDarkBrush}"
+                BorderBrush="{DynamicResource CardBorderBrush}"
+                BorderThickness="1"
+                CaretBrush="{DynamicResource PrimaryBrush}"
+                Foreground="{DynamicResource TextPrimaryBrush}"
+                PasswordChanged="OnPasswordChanged" />
+
+            <ItemsControl ItemsSource="{Binding Messages}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <TextBlock
+                            Margin="0,2"
+                            FontSize="12.5"
+                            Foreground="{DynamicResource WarningBrush}"
+                            Text="{Binding}"
+                            TextWrapping="Wrap" />
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <Border
+                Margin="0,8,0,0"
+                Padding="10,7"
+                Background="{DynamicResource SurfaceDarkBrush}"
+                CornerRadius="6">
+                <StackPanel Orientation="Horizontal">
+                    <materialDesign:PackIcon
+                        Width="15"
+                        Height="15"
+                        VerticalAlignment="Center"
+                        Foreground="{DynamicResource TextMutedBrush}"
+                        Kind="AccountCircle" />
+                    <TextBlock
+                        Margin="8,0,0,0"
+                        VerticalAlignment="Center"
+                        FontSize="12.5"
+                        Foreground="{DynamicResource TextSecondaryBrush}"
+                        Text="{Binding CurrentUserText}" />
+                </StackPanel>
+            </Border>
+
+            <StackPanel
+                Margin="0,18,0,0"
+                HorizontalAlignment="Right"
+                Orientation="Horizontal">
+                <Button
+                    MinWidth="88"
+                    Click="OnLogoutClick"
+                    Content="注销"
+                    IsEnabled="{Binding IsLoggedIn}"
+                    Style="{StaticResource DangerButton}" />
+                <Button
+                    MinWidth="88"
+                    Margin="10,0,0,0"
+                    Click="OnCancelClick"
+                    Content="关闭"
+                    Style="{StaticResource ControlButton}" />
+                <Button
+                    MinWidth="110"
+                    Margin="10,0,0,0"
+                    Click="OnLoginClick"
+                    Content="登录"
+                    Style="{StaticResource PrimaryButton}" />
+            </StackPanel>
+        </StackPanel>
+    </Border>
+</UserControl>

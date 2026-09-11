@@ -164,6 +164,11 @@ namespace Inspection.Services
 
                 cfg.ProductName = productName;
                 LocateVisionProgram(cfg);
+
+                // v2 老配置没有 Display 字段：反序列化后它是默认值（窗口数 4、窗口定义 0 条），
+                // 必须补齐窗口列表，否则界面会出现"有 4 个窗口但没有任何绑定规则"的错位状态。
+                cfg.NormalizeDisplay();
+
                 _logger.Information("产品配置已加载: {Product}", productName);
                 return cfg;
             }

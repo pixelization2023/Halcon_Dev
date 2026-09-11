@@ -1,5 +1,6 @@
 using Serilog;
 using System.Collections.ObjectModel;
+using MVS.Core;
 using WorkBench.Core;
 using WorkBench.Interfaces;
 using WorkBench.Models;
@@ -9,17 +10,40 @@ namespace WorkBench.ViewModels
     public class WorkBenchViewModel : BindableBase, INavigationAware
     {
         private readonly IWorkflowEngine _engine;
+        private readonly IVisionInterfaceProvider _visionInterface;
+
+        /// <summary>
+        /// PLC / MES 依赖：由组合根注入，构建步骤时**显式传给 Step**。
+        ///
+        /// 解耦要点：这两个依赖以前是 Step 在 ExecuteAsync 里自己走
+        /// <c>MVS.Core.AppContainer</c>（服务定位器）取的 —— 依赖关系编译期不可见、
+        /// 只能运行到那一步才发现缺失，也无法在测试里替换。现在从这里显式传下去。
+        /// </summary>
+        private readonly PLCModule.Interfaces.IPLCCommunicator _plcCommunicator;
+        private readonly MESModule.Interfaces.IMESConnector _mesConnector;
+
         private readonly ILogger _logger;
 
-        public WorkBenchViewModel(IWorkflowEngine engine, ILogger logger)
+        public WorkBenchViewModel(IWorkflowEngine engine, IVisionInterfaceProvider visionInterface,
+            ILogger logger,
+            PLCModule.Interfaces.IPLCCommunicator plcCommunicator,
+            MESModule.Interfaces.IMESConnector mesConnector)
         {
             _engine = engine;
+            _visionInterface = visionInterface;
             _logger = logger.ForContext<WorkBenchViewModel>();
+            _plcCommunicator = plcCommunicator
+                ?? throw new ArgumentNullException(nameof(plcCommunicator), "需要注入 IPLCCommunicator（见 PLCModule.RegisterTypes）");
+            _mesConnector = mesConnector
+                ?? throw new ArgumentNullException(nameof(mesConnector), "需要注入 IMESConnector（见 MESModule.RegisterTypes）");
 
             _engine.StepCompleted += OnStepCompleted;
             _engine.WorkflowCompleted += OnWorkflowCompleted;
             _engine.WorkflowError += OnWorkflowError;
 
+            QueryInterfaceCommand = new DelegateCommand<StepItem>(ExecuteQueryInterface);
+            AddPortCommand = new DelegateCommand<StepItem>(ExecuteAddPort);
+            RemovePortCommand = new DelegateCommand<StepPort>(ExecuteRemovePort);
             // 预设可选步骤类型
             AvailableStepTypes = new ObservableCollection<string>
             {
@@ -174,6 +198,104 @@ namespace WorkBench.ViewModels
                 Status = "步骤已清空";
             });
 
+        /// <summary>从 Halcon 过程接口导入端口（输入+输出）</summary>
+        public DelegateCommand<StepItem> QueryInterfaceCommand { get; }
+
+        /// <summary>给某步骤手工添加一个输入端口</summary>
+        public DelegateCommand<StepItem> AddPortCommand { get; }
+
+        /// <summary>移除一个端口</summary>
+        public DelegateCommand<StepPort> RemovePortCommand { get; }
+
+        private void ExecuteQueryInterface(StepItem? step)
+        {
+            if (step == null)
+            {
+                Status = "请先在步骤列表里选中一个步骤";
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(step.ProgramPath))
+            {
+                Status = "该步骤没有填写「程序」（过程名），无法读取接口";
+                return;
+            }
+
+            // 先清掉旧的输出端口，输入端口保留（现场已经填过值的不要被冲掉）
+            foreach (var port in step.Ports.Where(p => p.Direction == VisionPortDirection.Output).ToList())
+                step.Ports.Remove(port);
+
+            var descriptors = _visionInterface.QueryPorts(null, step.ProgramPath);
+
+            if (descriptors.Count == 0)
+            {
+                Status = $"未读取到过程 [{step.ProgramPath}] 的接口：请确认方案已加载、过程名与控制台里一致";
+                return;
+            }
+
+            int added = 0;
+            foreach (var d in descriptors)
+            {
+                // 输入端口如果已存在同名项，只更新类型/说明，不覆盖用户填好的值
+                var existing = step.Ports.FirstOrDefault(p =>
+                    p.Direction == d.Direction && string.Equals(p.Name, d.Name, StringComparison.Ordinal));
+
+                if (existing != null)
+                {
+                    existing.DataType = d.DataType;
+                    existing.Description = d.Description;
+                    continue;
+                }
+
+                step.Ports.Add(new StepPort
+                {
+                    Direction = d.Direction,
+                    Name = d.Name,
+                    DataType = d.DataType,
+                    Value = string.Empty,
+                    Description = d.Description
+                });
+                added++;
+            }
+
+            step.RaisePortSummaries();
+
+            var inputs = step.Ports.Count(p => p.Direction == VisionPortDirection.Input);
+            var outputs = step.Ports.Count(p => p.Direction == VisionPortDirection.Output);
+            Status = $"已读取过程 [{step.ProgramPath}] 的接口：输入 {inputs} 个 / 输出 {outputs} 个（新增 {added} 个）";
+            _logger.Information("工作台步骤接口已导入: {Procedure} 输入{In} 输出{Out}",
+                step.ProgramPath, inputs, outputs);
+        }
+
+        private void ExecuteAddPort(StepItem? step)
+        {
+            if (step == null) return;
+
+            step.Ports.Add(new StepPort
+            {
+                Direction = VisionPortDirection.Input,
+                Name = "NewParam",
+                DataType = VisionPortDataType.Double,
+                Value = "0",
+                Description = "手工添加"
+            });
+            step.RaisePortSummaries();
+        }
+
+        private void ExecuteRemovePort(StepPort? port)
+        {
+            if (port == null) return;
+
+            foreach (var step in Steps)
+            {
+                if (step.Ports.Remove(port))
+                {
+                    step.RaisePortSummaries();
+                    break;
+                }
+            }
+        }
+
         #endregion
 
         #region 执行命令
@@ -205,23 +327,30 @@ namespace WorkBench.ViewModels
 
                     foreach (var s in Steps)
                     {
+                        // 步骤参数：目前由 StepItem.Parameters 提供（输入端口模型落地前的过渡，
+                        // 见方案文档第 7 节）。这里必须真正传下去 ——
+                        // 旧实现把 Inspect() 的 parameters 参数丢掉了，算法参数无处配置。
+                        var parameters = s.BuildParameterDictionary();
+
                         switch (s.TypeName)
                         {
                             case var t when t.Contains("Acquisition") || t.Contains("采集"):
                                 builder.Acquire(s.CameraName, TimeSpan.FromSeconds(s.TimeoutSeconds));
                                 break;
                             case var t when t.Contains("Inspection") || t.Contains("检测"):
-                                builder.Inspect(s.ProgramPath, timeout: TimeSpan.FromSeconds(s.TimeoutSeconds));
+                                builder.Inspect(s.ProgramPath, parameters, TimeSpan.FromSeconds(s.TimeoutSeconds));
                                 break;
                             case var t when t.Contains("Decision") || t.Contains("判定"):
                                 builder.Decide();
                                 break;
                             case var t when t.Contains("PLCWrite") || t.Contains("PLC"):
+                                // 显式把 IPLCCommunicator 传进步骤：依赖在构造期确定，
+                                // 不再由步骤自己在运行时走服务定位器（见字段注释）
                                 builder.WritePLC(new Dictionary<string, object> { { "Result", true } },
-                                    TimeSpan.FromSeconds(s.TimeoutSeconds));
+                                    TimeSpan.FromSeconds(s.TimeoutSeconds), _plcCommunicator);
                                 break;
                             case var t when t.Contains("MESUpload") || t.Contains("MES"):
-                                builder.UploadMES(TimeSpan.FromSeconds(s.TimeoutSeconds));
+                                builder.UploadMES(TimeSpan.FromSeconds(s.TimeoutSeconds), _mesConnector);
                                 break;
                         }
                     }
@@ -328,6 +457,117 @@ namespace WorkBench.ViewModels
 
         private int _timeoutSeconds = 10;
         public int TimeoutSeconds { get => _timeoutSeconds; set => SetProperty(ref _timeoutSeconds, value); }
+
+        private string _parametersText = "";
+        /// <summary>
+        /// 算法参数（输入端口的最小可用形态）。
+        /// 格式：<c>参数名=值</c>，多个用 <c>;</c> 或换行分隔，例如
+        /// <c>MinGray=128; MaxGray=255; ModelFile=C:\model.shm</c>。
+        /// 纯数字会自动转成数值类型传给过程；其余按字符串传递。
+        ///
+        /// 说明：更完整的做法是用下面的 <see cref="Ports"/>（可由「从过程接口导入」一键生成）。
+        /// 保留这个文本框是为了兼容手写参数的现场习惯，两者会合并后一起传给过程。
+        /// </summary>
+        public string ParametersText
+        {
+            get => _parametersText;
+            set => SetProperty(ref _parametersText, value);
+        }
+
+        /// <summary>
+        /// 步骤端口（输入 / 输出）。由「从过程接口导入」按 Halcon 过程的接口自动填充，
+        /// 也可以在界面上手工增删。输出端口只用于查看与后续引用。
+        /// </summary>
+        public ObservableCollection<StepPort> Ports { get; } = new();
+
+        /// <summary>输入端口的可读汇总（列表项上显示）</summary>
+        public string InputPortSummary
+        {
+            get
+            {
+                var inputs = Ports.Where(p => p.Direction == VisionPortDirection.Input).Select(p => p.Name).ToList();
+                return inputs.Count == 0 ? "（未配置输入）" : string.Join(", ", inputs);
+            }
+        }
+
+        /// <summary>输出端口的可读汇总（列表项上显示）</summary>
+        public string OutputPortSummary
+        {
+            get
+            {
+                var outputs = Ports.Where(p => p.Direction == VisionPortDirection.Output).Select(p => p.Name).ToList();
+                return outputs.Count == 0 ? "（未读取输出）" : string.Join(", ", outputs);
+            }
+        }
+
+        /// <summary>端口集合变化后刷新两个汇总文本</summary>
+        public void RaisePortSummaries()
+        {
+            RaisePropertyChanged(nameof(InputPortSummary));
+            RaisePropertyChanged(nameof(OutputPortSummary));
+        }
+
+        /// <summary>
+        /// 汇总最终传给过程的参数：
+        /// 先取 <see cref="ParametersText"/> 的手写键值，再用 <see cref="Ports"/> 里的输入端口覆盖/追加
+        /// （端口是结构化的，优先级更高）。
+        /// </summary>
+        public Dictionary<string, object>? BuildParameterDictionary()
+        {
+            var dict = new Dictionary<string, object>(StringComparer.Ordinal);
+
+            // 1) 手写参数
+            if (!string.IsNullOrWhiteSpace(_parametersText))
+            {
+                foreach (var raw in _parametersText.Split(new[] { ';', '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries))
+                {
+                    var line = raw.Trim();
+                    if (line.Length == 0) continue;
+
+                    var index = line.IndexOf('=');
+                    if (index <= 0) continue;
+
+                    var key = line.Substring(0, index).Trim();
+                    var value = line.Substring(index + 1).Trim();
+                    if (key.Length == 0) continue;
+
+                    dict[key] = ConvertValue(value);
+                }
+            }
+
+            // 2) 结构化输入端口（覆盖同名手写参数）
+            foreach (var port in Ports)
+            {
+                if (port.Direction != VisionPortDirection.Input) continue;
+                if (string.IsNullOrWhiteSpace(port.Name)) continue;
+
+                // 图像端口由执行引擎单独设置（SetInputIconicParam），这里不放进控制参数里
+                if (port.DataType == VisionPortDataType.Image) continue;
+
+                dict[port.Name.Trim()] = ConvertValue(port.Value);
+            }
+
+            return dict.Count > 0 ? dict : null;
+        }
+
+        /// <summary>按端口类型把字符串转成合适的对象（数值优先）</summary>
+        private static object ConvertValue(string? value)
+        {
+            var text = value ?? string.Empty;
+
+            if (long.TryParse(text, System.Globalization.NumberStyles.Integer,
+                    System.Globalization.CultureInfo.InvariantCulture, out var l))
+                return l;
+
+            if (double.TryParse(text, System.Globalization.NumberStyles.Float,
+                    System.Globalization.CultureInfo.InvariantCulture, out var d))
+                return d;
+
+            if (bool.TryParse(text, out var b))
+                return b;
+
+            return text;
+        }
 
         public string DisplayName => TypeName switch
         {

@@ -6,6 +6,17 @@
     xmlns:prism="http://prismlibrary.com/"
     prism:ViewModelLocator.AutoWireViewModel="True">
 
+    <!--
+        权限模型：整页 IsEnabled 绑定到 CanEdit（= 工程师及以上）。
+        未登录 / 操作员登录时整页只读 —— 能看产品列表与配置，但改不了、存不了。
+        与「检测配置」页保持同一套做法（WPF 的 IsEnabled 会向下级联）。
+    -->
+    <UserControl.Style>
+        <Style TargetType="UserControl">
+            <Setter Property="IsEnabled" Value="{Binding CanEdit}" />
+        </Style>
+    </UserControl.Style>
+
     <Grid>
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="420" />
@@ -93,13 +104,29 @@
                         Margin="0,12,0,0"
                         AutoGenerateColumns="False"
                         CanUserAddRows="False"
+                        CanUserDeleteRows="False"
                         ItemsSource="{Binding Cameras}"
                         MaxHeight="260">
                         <DataGrid.Columns>
                             <DataGridTextColumn Binding="{Binding Name}" Header="名称" Width="140" />
-                            <DataGridTextColumn Binding="{Binding Kind}" Header="种类" Width="120" />
-                            <DataGridTextColumn Binding="{Binding SerialNumber}" Header="SN 序列号" Width="*" />
+                            <!--  设备种类用下拉：手打成"海康相机"这类文本一旦写错，运行期匹配不到设备  -->
+                            <DataGridTemplateColumn Header="种类" Width="130">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <ComboBox
+                                            ItemsSource="{Binding DataContext.DeviceKinds, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                            SelectedItem="{Binding Kind, UpdateSourceTrigger=PropertyChanged}" />
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                            <DataGridTextColumn Binding="{Binding SerialNumber}" Header="SN 序列号（可直接编辑）" Width="*" />
                             <DataGridTextColumn Binding="{Binding Order}" Header="顺序" Width="70" />
+                            <!--
+                                图片序号：编排器靠它把"哪张图"匹配到配方的「图片索引」。
+                                多相机时必须配，否则按绑定顺序自动分配（图片总数不够分时会告警并退化为共用序号）。
+                                留空 = 自动。
+                            -->
+                            <DataGridTextColumn Binding="{Binding ImageIndexes}" Header="图片序号（如 1,2；留空自动）" Width="180" />
                             <DataGridTemplateColumn Header="操作" Width="90">
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate>
@@ -113,6 +140,56 @@
                             </DataGridTemplateColumn>
                         </DataGrid.Columns>
                     </DataGrid>
+
+                    <TextBlock
+                        Margin="0,10,0,0"
+                        Style="{StaticResource MutedText}"
+                        Text="SN 一栏直接双击即可编辑；改完记得点左侧「保存配置」。留空 SN 表示尚未绑定实体设备。" />
+                </StackPanel>
+            </Border>
+
+            <!--  制品规模：图片数 / PCS 数 / 二维码数（决定配方校验与上传顺序，以前只能手改 JSON）  -->
+            <Border Margin="0,16,0,0" Style="{StaticResource CardBorder}">
+                <StackPanel>
+                    <TextBlock Style="{StaticResource SectionTitle}" Text="制品规模（原 PicNum / UploadNum / CodeNum）" />
+                    <StackPanel Margin="0,10,0,0" Orientation="Horizontal">
+                        <TextBlock
+                            VerticalAlignment="Center"
+                            Style="{StaticResource DataLabel}"
+                            Text="拍摄图片总数" />
+                        <TextBox
+                            Width="70"
+                            Margin="8,0,24,0"
+                            Style="{StaticResource DarkTextBox}"
+                            Text="{Binding ImageTotal, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBlock
+                            VerticalAlignment="Center"
+                            Style="{StaticResource DataLabel}"
+                            Text="整张 PCS 总数" />
+                        <TextBox
+                            Width="70"
+                            Margin="8,0,24,0"
+                            Style="{StaticResource DarkTextBox}"
+                            Text="{Binding SheetPcsTotal, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBlock
+                            VerticalAlignment="Center"
+                            Style="{StaticResource DataLabel}"
+                            Text="二维码个数" />
+                        <TextBox
+                            Width="70"
+                            Margin="8,0,0,0"
+                            Style="{StaticResource DarkTextBox}"
+                            Text="{Binding CodeCount, UpdateSourceTrigger=PropertyChanged}" />
+                        <Button
+                            Margin="24,0,0,0"
+                            Command="{Binding ApplyScaleCommand}"
+                            Content="应用并校验"
+                            Style="{StaticResource ControlButton}" />
+                    </StackPanel>
+                    <TextBlock
+                        Margin="0,10,0,0"
+                        Style="{StaticResource MutedText}"
+                        Text="改动会影响「上传顺序」与配方校验结果；点「应用并校验」后上传顺序会按 PCS 总数自动补全。" />
                 </StackPanel>
             </Border>
 

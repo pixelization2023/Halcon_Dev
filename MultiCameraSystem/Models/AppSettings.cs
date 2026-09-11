@@ -26,6 +26,25 @@ namespace MultiCameraSystem.Models
         public int GrabTimeout { get; set; } = 1000;
         public int BufferCount { get; set; } = 5;
         public string ImageFormat { get; set; } = "Bmp";
+
+        /// <summary>
+        /// 每台相机（按序列号）单独保存的曝光/增益。
+        ///
+        /// 为什么需要：相机控制页的「保存参数」以前只把值写进相机寄存器（掉电即失），
+        /// 换台相机或重启后又要重新调。这里按序列号区分，读出来是每台设备自己的值，
+        /// 没记录过的设备回退到上面的默认值。
+        /// </summary>
+        public Dictionary<string, CameraParameterSettings> PerCamera { get; set; } = new();
+    }
+
+    /// <summary>单台相机的持久化参数</summary>
+    public class CameraParameterSettings
+    {
+        public float ExposureTime { get; set; } = 5000f;
+        public float Gain { get; set; } = 20f;
+
+        /// <summary>最近一次保存时间（现场排查"参数是不是被改过"用）</summary>
+        public DateTime? SavedAt { get; set; }
     }
 
     public class PLCSettings

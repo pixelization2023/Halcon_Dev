@@ -30,9 +30,32 @@ namespace WorkBench.ViewModels
         {
             _logger = logger.ForContext<ResultDashboardViewModel>();
 
-            ThemePalette.Changed += (_, _) => RebuildCharts();
+            // 保存成字段而不是内联 lambda：内联 lambda 无法退订，
+            // 而 ThemePalette.Changed 是**静态事件** —— 不退订就是永久泄漏
+            //（本类 IsNavigationTarget => true，实例会被 Prism 复用）。
+            Subscribe();
             RebuildCharts();
         }
+
+        private bool _subscribed;
+
+        /// <summary>订阅主题变化（幂等）</summary>
+        private void Subscribe()
+        {
+            if (_subscribed) return;
+            _subscribed = true;
+            ThemePalette.Changed += OnThemePaletteChanged;
+        }
+
+        /// <summary>退订主题变化（与 <see cref="Subscribe"/> 严格配对）</summary>
+        private void Unsubscribe()
+        {
+            if (!_subscribed) return;
+            _subscribed = false;
+            ThemePalette.Changed -= OnThemePaletteChanged;
+        }
+
+        private void OnThemePaletteChanged(object? sender, EventArgs e) => RebuildCharts();
 
         public ObservableCollection<AggregatedResult> Results { get; } = new();
 
@@ -181,6 +204,8 @@ namespace WorkBench.ViewModels
 
         public void OnNavigatedTo(NavigationContext navigationContext)
         {
+            // 重新进入时恢复订阅（离开时退订了）；Subscribe 自带幂等保护
+            Subscribe();
             _logger.Information("进入结果仪表盘");
         }
 
@@ -188,6 +213,8 @@ namespace WorkBench.ViewModels
 
         public void OnNavigatedFrom(NavigationContext navigationContext)
         {
+            // 与 OnNavigatedTo 严格配对，避免静态事件（ThemePalette.Changed）长期持有本实例
+            Unsubscribe();
             _logger.Debug("离开结果仪表盘");
         }
     }

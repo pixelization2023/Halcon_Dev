@@ -23,12 +23,20 @@ namespace MultiCameraSystem.ViewModels
     public class RunViewModel : BindableBase, INavigationAware
     {
         private readonly HalconRunService _halcon;
+
+        /// <summary>
+        /// 文件选择服务。
+        /// 解耦要点：不再直接 <c>new OpenFileDialog()</c> —— ViewModel 不依赖 UI 类型，测试可替换。
+        /// </summary>
+        private readonly MVS.Core.IFileDialogService _fileDialogs;
+
         private readonly ILogger _logger;
         private HWindow? _halconWindow;
 
-        public RunViewModel(HalconRunService halcon, ILogger logger)
+        public RunViewModel(HalconRunService halcon, MVS.Core.IFileDialogService fileDialogs, ILogger logger)
         {
             _halcon = halcon;
+            _fileDialogs = fileDialogs;
             _logger = logger.ForContext<RunViewModel>();
 
             WindowReadyCommand = new DelegateCommand<HWindow>(h => _halconWindow = h);
@@ -132,20 +140,17 @@ namespace MultiCameraSystem.ViewModels
 
         private void ExecuteLoadImage()
         {
-            var dialog = new OpenFileDialog
-            {
-                Title = "选择检测图像",
-                Filter = "图像文件|*.png;*.jpg;*.jpeg;*.bmp;*.tif|所有文件|*.*"
-            };
+            var file = _fileDialogs.OpenFile("选择检测图像",
+                "图像文件|*.png;*.jpg;*.jpeg;*.bmp;*.tif|所有文件|*.*");
 
-            if (dialog.ShowDialog() != true) return;
+            if (string.IsNullOrEmpty(file)) return;
 
             try
             {
-                HOperatorSet.ReadImage(out HObject img, dialog.FileName);
+                HOperatorSet.ReadImage(out HObject img, file);
                 CurrentImage = img;
-                Status = $"已加载: {Path.GetFileName(dialog.FileName)}";
-                _logger.Information("加载图像: {Path}", dialog.FileName);
+                Status = $"已加载: {Path.GetFileName(file)}";
+                _logger.Information("加载图像: {Path}", file);
             }
             catch (Exception ex)
             {
@@ -199,17 +204,14 @@ namespace MultiCameraSystem.ViewModels
 
         private void ExecuteSelectProgram()
         {
-            var dialog = new OpenFileDialog
-            {
-                Title = "选择 HDevelop 程序",
-                Filter = "HDevelop 文件|*.hdev;*.hdvp|所有文件|*.*"
-            };
+            var file = _fileDialogs.OpenFile("选择 HDevelop 程序",
+                "HDevelop 文件|*.hdev;*.hdvp|所有文件|*.*");
 
-            if (dialog.ShowDialog() != true) return;
+            if (string.IsNullOrEmpty(file)) return;
 
-            SelectedProgram = dialog.FileName;
-            Status = $"已选择: {Path.GetFileName(dialog.FileName)}";
-            _logger.Information("选择检测程序: {Path}", dialog.FileName);
+            SelectedProgram = file;
+            Status = $"已选择: {Path.GetFileName(file)}";
+            _logger.Information("选择检测程序: {Path}", file);
         }
 
         #endregion

@@ -1,6 +1,4 @@
-using System.Collections.Concurrent;
 using System.Diagnostics;
-using System.IO;
 using HalconDotNet;
 using Inspection.Models;
 using Serilog;
@@ -32,7 +30,8 @@ namespace Inspection.Services
         private readonly InspectionResultStore _store;
         private readonly ILogger _logger;
 
-        private readonly BlockingCollection<QueuedFrame> _frames = new(new ConcurrentQueue<QueuedFrame>());
+        // 待检测图像队列：容量、丢最旧策略、丢弃计数与节流告警都在 FrameQueue 内（见该类注释）
+        private readonly FrameQueue _frameQueue;
         private CancellationTokenSource? _cts;
         private Task? _worker;
         private bool _disposed;
@@ -47,7 +46,6 @@ namespace Inspection.Services
         private LongCodePayload? _lotInfo;
         private DateTime _sheetStartedAt = DateTime.Now;
         private bool _allImagesProcessed;
-        private bool _codeMissed;
 
         public InspectionOrchestrator(ProductRepository repository, HalconInspectionService halcon,
             ImageArchiveService archive, UploadOrchestrator upload, PlcIoService plc,
@@ -64,6 +62,8 @@ namespace Inspection.Services
             _trace = trace;
             _store = store;
             _logger = logger.ForContext<InspectionOrchestrator>();
+
+            _frameQueue = new FrameQueue(OnFramesDropped);
 
             _plc.CameraTriggerRequested += (_, e) => CameraTriggerRequested?.Invoke(this, e);
             _plc.RepositionRequested += (_, e) => RepositionRequested?.Invoke(this, e);
@@ -115,6 +115,24 @@ namespace Inspection.Services
 
         /// <summary>产品加载完成（外壳据此绑定相机）</summary>
         public event EventHandler<ProductConfiguration>? ProductLoaded;
+
+        /// <summary>
+        /// 产品配置被修改（例如在「检测配置」页保存了显示设置）。
+        /// 界面据此刷新依赖配置的显示内容 —— 否则用户改了窗口绑定 / NG 框样式后，
+        /// 主监控台不会立刻跟着变，要等下次加载产品。
+        /// </summary>
+        public event EventHandler<ProductConfiguration>? ConfigurationChanged;
+
+        /// <summary>通知外部"配置已变"（由写配置的界面在保存成功后调用）</summary>
+        public void NotifyConfigurationChanged()
+        {
+            var cfg = Configuration;
+            if (cfg == null) return;
+
+            // 统一在这里做一次规整化，避免各处调用点漏掉（窗口列表与窗口数必须始终一致）
+            cfg.NormalizeDisplay();
+            ConfigurationChanged?.Invoke(this, cfg);
+        }
 
         /// <summary>PLC 请求触发相机（由外壳转发给相机服务）</summary>
         public event EventHandler<PlcTriggerEventArgs>? CameraTriggerRequested;
@@ -241,7 +259,7 @@ namespace Inspection.Services
             _cts?.Dispose();
             _cts = null;
 
-            DrainQueue();
+            _frameQueue.Drain();
             _logger.Information("检测编排线程已停止");
         }
 
@@ -288,28 +306,27 @@ namespace Inspection.Services
                 return false;
             }
 
-            try
-            {
-                return _frames.TryAdd(frame);
-            }
-            catch (InvalidOperationException)
-            {
-                frame.Dispose();
-                return false;
-            }
+            // 队列满时的取舍（丢最旧、计数、按秒节流）全部由 FrameQueue 负责，见其类注释
+            return _frameQueue.TryEnqueue(frame);
         }
 
-        private void DrainQueue()
+        /// <summary>队列溢出告警：FrameQueue 已完成节流，这里只决定"报给谁"</summary>
+        private void OnFramesDropped(int total)
         {
-            while (_frames.TryTake(out var frame))
-                frame.Dispose();
+            _logger.Warning("待检测图像队列已满（上限 {Max} 张），已丢弃最旧的图像；累计丢弃 {Total} 帧。" +
+                            "这说明检测节拍跟不上采集节拍，请检查配方耗时或相机触发频率",
+                FrameQueue.Capacity, total);
+            Report($"警告：图像积压，已丢弃最旧的图像（累计 {total} 帧），检测节拍可能跟不上采集");
         }
+
+        /// <summary>累计丢弃的帧数（自检/诊断用）</summary>
+        public int DroppedFrameCount => _frameQueue.DroppedCount;
 
         private async Task ConsumeLoopAsync(CancellationToken ct)
         {
             try
             {
-                foreach (var frame in _frames.GetConsumingEnumerable(ct))
+                foreach (var frame in _frameQueue.Consume(ct))
                 {
                     try
                     {
@@ -382,7 +399,6 @@ namespace Inspection.Services
         {
             if (string.IsNullOrWhiteSpace(code))
             {
-                _codeMissed = true;
                 Report("未扫描到二维码！");
                 await _plc.SignalNoCodeAsync().ConfigureAwait(false);
                 return;
@@ -448,7 +464,11 @@ namespace Inspection.Services
                 OutputImage = pcs.OutputImage,
                 PhotoName = frame.PhotoName,
                 ElapsedMs = recipeElapsedMs,
-                Judgment = pcs.ItemResults.Contains("1") ? PcsJudgment.Ng : PcsJudgment.Ok
+                Judgment = pcs.HasNg ? PcsJudgment.Ng : PcsJudgment.Ok,
+                SourceImageIndex = frame.ImageIndex,
+                // 原图副本：留给界面显示（消费循环随后会 Dispose 掉 frame.Image）。
+                // 现场很多 .hdev 不输出结果图，界面必须有原图可显示。
+                SourceImage = TryCloneImage(frame.Image)
             };
 
             // ---- 上传顺序绑定（原 UploadOrderBuild[RunPcsIndex]） ----
@@ -510,9 +530,11 @@ namespace Inspection.Services
             if (!toggles.NgImage && !toggles.OriginalImage && !toggles.ReCheckImage)
                 return;
 
-            // 结果图优先使用 Halcon 输出图，否则回退到原始输入图
-            var image = result.OutputImage ?? frame.Image;
-            if (image == null || !image.IsInitialized()) return;
+            // 结果图优先使用 Halcon 输出图；"原始图"分支必须用真正的原图副本
+            //（result.SourceImage），不能沿用 image —— 那在 .hdev 有结果图时其实是结果图，
+            // 会把结果图当成原始图存进 OriginalPath。旧实现有这个隐患。
+            var resultImage = result.OutputImage ?? frame.Image;
+            var originalImage = result.SourceImage ?? frame.Image;
 
             var location = cfg.GetImageLocation();
             var laser = result.LaserCode.Length > 0
@@ -523,13 +545,17 @@ namespace Inspection.Services
             {
                 if (toggles.OriginalImage && !string.IsNullOrWhiteSpace(location.OriginalPath))
                 {
-                    var path = Path.Combine(location.OriginalPath, DateTime.Now.ToString("yyyyMMdd"),
-                        result.PhotoName + "-" + laser + ".bmp");
-                    _archive.Enqueue(image.Clone(), path, useJpeg: false);
+                    if (originalImage != null && originalImage.IsInitialized())
+                    {
+                        var path = ImageArchiveService.BuildOriginalPath(location.OriginalPath, result.PhotoName, laser);
+                        _archive.Enqueue(originalImage.Clone(), path, useJpeg: false);
+                    }
                 }
 
                 if (toggles.NgImage || toggles.ReCheckImage)
                 {
+                    if (resultImage == null || !resultImage.IsInitialized()) return;
+
                     var root = result.Judgment == PcsJudgment.Ng ? location.NgPath
                         : (toggles.ReCheckImage ? location.ReCheckPath : location.OkPath);
 
@@ -537,7 +563,7 @@ namespace Inspection.Services
                     {
                         var path = ImageArchiveService.BuildResultPath(root, result.Judgment == PcsJudgment.Ng,
                             result.PhotoName, laser, result.PcsKey);
-                        _archive.Enqueue(image.Clone(), path, useJpeg: true, quality: location.ZipQuality);
+                        _archive.Enqueue(resultImage.Clone(), path, useJpeg: true, quality: location.ZipQuality);
                         result.PhotoName = path;
                     }
                 }
@@ -545,6 +571,22 @@ namespace Inspection.Services
             catch (Exception ex)
             {
                 _logger.Warning(ex, "存图任务创建失败: PCS {Pcs}", result.PcsIndex);
+            }
+        }
+
+        /// <summary>尝试克隆一份图像（失败返回 null，不抛）</summary>
+        private HObject? TryCloneImage(HObject? image)
+        {
+            if (image == null || !image.IsInitialized()) return null;
+
+            try
+            {
+                return image.Clone();
+            }
+            catch (Exception ex)
+            {
+                _logger.Warning(ex, "克隆原图失败（界面将只能显示结果图）");
+                return null;
             }
         }
 
@@ -590,6 +632,13 @@ namespace Inspection.Services
         /// <summary>清除当前料数据（迁移自 FrmMian.ClearDate）</summary>
         public void ClearSheet()
         {
+            // PCS 结果图的**所有权在这一层**：每个 PcsInspectionResult.OutputImage 是 Halcon 过程输出的
+            // HObject（由 CollectPcsResults 取得所有权）。这里必须显式释放，否则每张料的所有结果图
+            // 都会一直挂在 _results 里 —— 换料/长时间运行就是内存泄漏。
+            // 界面（DashboardViewModel）只持有引用，不负责释放。
+            foreach (var result in _results.Values)
+                result.DisposeImage();
+
             _results.Clear();
             _paperCodes.Clear();
             _laserCodes.Clear();
@@ -597,7 +646,6 @@ namespace Inspection.Services
             _runImage = 0;
             _runPcsIndex = 0;
             _allImagesProcessed = false;
-            _codeMissed = false;
             _sheetStartedAt = DateTime.Now;
 
             Summary.ProcessedImages = 0;
@@ -628,7 +676,7 @@ namespace Inspection.Services
             _disposed = true;
 
             try { StopAsync().GetAwaiter().GetResult(); } catch { }
-            _frames.Dispose();
+            _frameQueue.Dispose();
         }
     }
 }

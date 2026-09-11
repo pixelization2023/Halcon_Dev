@@ -1,4 +1,4 @@
-using System.Windows.Media;
+﻿using System.Windows.Media;
 
 namespace MVS.Core
 {
@@ -12,7 +12,7 @@ namespace MVS.Core
     ///
     /// 所以这里放一个极薄的桥：ThemeService 每次应用主题时把「语义键 → 颜色」的解析器登记进来，
     /// 任何模块都能取到**当前主题的颜色**，并在主题变化时收到通知重建图表。
-    /// 与既有的 <see cref="AppContainer"/> 一样，属于共享内核里约定的桥接点。
+    /// 属于共享内核里约定的桥接点（同类的还有 IVisionInterfaceProvider）。
     /// </summary>
     public static class ThemePalette
     {

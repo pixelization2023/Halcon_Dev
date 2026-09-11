@@ -17,12 +17,12 @@ namespace WorkBench.Steps
             _logger = Serilog.Log.Logger.ForContext<AcquisitionStep>();
         }
 
-        public override async Task<bool> ValidateAsync(IInspectionContext context)
+        public override Task<bool> ValidateAsync(IInspectionContext context)
         {
-            return !string.IsNullOrEmpty(_cameraName);
+            return Task.FromResult(!string.IsNullOrEmpty(_cameraName));
         }
 
-        public override async Task<StepResult> ExecuteAsync(IInspectionContext context, CancellationToken ct)
+        public override Task<StepResult> ExecuteAsync(IInspectionContext context, CancellationToken ct)
         {
             var sw = Stopwatch.StartNew();
 
@@ -32,19 +32,19 @@ namespace WorkBench.Steps
                 if (image == null || !image.IsInitialized())
                 {
                     _logger.Warning("相机 {Camera} 图像为空", _cameraName);
-                    return StepResult.Fail(Name, StepType.Acquisition, $"相机 {_cameraName} 图像为空", sw.ElapsedMilliseconds);
+                    return Task.FromResult(StepResult.Fail(Name, StepType.Acquisition, $"相机 {_cameraName} 图像为空", sw.ElapsedMilliseconds));
                 }
 
                 var clone = image.Clone();
                 context.SetImage(_cameraName, clone);
                 _logger.Debug("相机 {Camera} 采集完成 ({Ms}ms)", _cameraName, sw.ElapsedMilliseconds);
 
-                return StepResult.Ok(Name, StepType.Acquisition, sw.ElapsedMilliseconds);
+                return Task.FromResult(StepResult.Ok(Name, StepType.Acquisition, sw.ElapsedMilliseconds));
             }
             catch (Exception ex)
             {
                 _logger.Error(ex, "相机 {Camera} 采集失败", _cameraName);
-                return StepResult.Fail(Name, StepType.Acquisition, ex.Message, sw.ElapsedMilliseconds);
+                return Task.FromResult(StepResult.Fail(Name, StepType.Acquisition, ex.Message, sw.ElapsedMilliseconds));
             }
         }
     }

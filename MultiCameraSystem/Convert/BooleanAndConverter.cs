@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
@@ -32,7 +32,13 @@ namespace MultiCameraSystem.Convert
 
         public object[] ConvertBack(object value, Type[] targetTypes, object parameter, CultureInfo culture)
         {
-            throw new NotImplementedException();
+            // 多值绑定的反向转换在语义上无唯一解（true 无法反推出各分量），
+            // 因此返回 Binding.DoNothing 表示"不写回源"，而不是抛 NotImplementedException ——
+            // 后者一旦被 WPF 调用到就是界面白屏/运行期异常，且极难定位。
+            var result = new object[targetTypes?.Length ?? 0];
+            for (int i = 0; i < result.Length; i++)
+                result[i] = Binding.DoNothing;
+            return result;
         }
     }
 }

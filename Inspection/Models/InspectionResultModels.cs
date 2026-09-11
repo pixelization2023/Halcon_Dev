@@ -58,6 +58,22 @@ namespace Inspection.Models
         /// <summary>Halcon 输出的 PCS 结果图像（由调用方负责释放）</summary>
         public HObject? OutputImage { get; set; }
 
+        /// <summary>
+        /// 本 PCS 的来源图片序号（1 开始）。
+        /// 多窗口显示要支持"按图片序号绑定窗口"（DisplayBindMode.ByImage），必须有这个信息。
+        /// </summary>
+        public int SourceImageIndex { get; set; }
+
+        /// <summary>
+        /// 原始输入图（**副本**，由本对象拥有所有权）。
+        ///
+        /// 为什么需要副本：消费循环拿到一帧后，处理完会在 finally 里 Dispose 掉 QueuedFrame.Image
+        ///（见 InspectionOrchestrator.ConsumeLoopAsync），而界面要在这之后仍然能显示原始图
+        ///（例如现场 .hdev 根本不输出结果图，或者某窗口刻意配置为看原图）。
+        /// 所以这里 Clone 一份留给显示，由 <see cref="DisposeImage"/> / ClearSheet 统一释放。
+        /// </summary>
+        public HObject? SourceImage { get; set; }
+
         /// <summary>结果图片文件名</summary>
         public string PhotoName { get; set; } = string.Empty;
 
@@ -83,6 +99,10 @@ namespace Inspection.Models
         {
             OutputImage?.Dispose();
             OutputImage = null;
+
+            // 原图副本同样归本对象所有，必须一起释放（否则每张料泄漏一份全尺寸原图）
+            SourceImage?.Dispose();
+            SourceImage = null;
         }
 
         public override string ToString()

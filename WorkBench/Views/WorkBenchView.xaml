@@ -88,6 +88,7 @@
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
                         <RowDefinition Height="*" />
                     </Grid.RowDefinitions>
 
@@ -160,18 +161,20 @@
                                                 Background="{DynamicResource SurfaceDarkBrush}"
                                                 CornerRadius="6" Cursor="Hand">
                                             <StackPanel>
-                                                <Grid>
-                                                    <TextBlock FontSize="12" FontWeight="SemiBold"
-                                                               Foreground="{DynamicResource TextPrimaryBrush}"
-                                                               Text="{Binding DisplayName}" />
-                                                    <Button HorizontalAlignment="Right" Width="18" Height="18"
+                                                <DockPanel LastChildFill="True">
+                                                    <Button DockPanel.Dock="Right" Width="18" Height="18"
                                                             Padding="0" Background="Transparent" BorderThickness="0"
+                                                            VerticalAlignment="Top"
                                                             Command="{Binding DataContext.RemoveStepCommand, RelativeSource={RelativeSource AncestorType=ListBox}}"
                                                             CommandParameter="{Binding}">
                                                         <TextBlock FontSize="10"
                                                                    Foreground="{DynamicResource ErrorBrush}" Text="✕" />
                                                     </Button>
-                                                </Grid>
+                                                    <TextBlock FontSize="12" FontWeight="SemiBold"
+                                                               VerticalAlignment="Center"
+                                                               Foreground="{DynamicResource TextPrimaryBrush}"
+                                                               Text="{Binding DisplayName}" />
+                                                </DockPanel>
                                                 <StackPanel Margin="0,4,0,0" Orientation="Horizontal">
                                                     <TextBlock FontSize="9"
                                                                Foreground="{DynamicResource TextMutedBrush}" Text="超时:" />
@@ -193,6 +196,17 @@
                                                              Foreground="{DynamicResource TextPrimaryBrush}"
                                                              CaretBrush="{DynamicResource PrimaryBrush}"
                                                              Text="{Binding ProgramPath}"
+                                                             VerticalContentAlignment="Center" />
+                                                </StackPanel>
+                                                <!--  算法参数（输入端口）：名=值，多个用 ; 分隔  -->
+                                                <StackPanel Margin="0,4,0,0" Orientation="Horizontal">
+                                                    <TextBlock FontSize="9" VerticalAlignment="Center"
+                                                               Foreground="{DynamicResource TextMutedBrush}" Text="参数:" />
+                                                    <TextBox MinWidth="180" Margin="4,0,0,0" FontSize="9"
+                                                             ToolTip="算法输入参数，格式：名=值，多个用 ; 分隔。例：MinGray=128; MaxGray=255"
+                                                             Foreground="{DynamicResource TextPrimaryBrush}"
+                                                             CaretBrush="{DynamicResource PrimaryBrush}"
+                                                             Text="{Binding ParametersText, UpdateSourceTrigger=PropertyChanged}"
                                                              VerticalContentAlignment="Center" />
                                                 </StackPanel>
                                             </StackPanel>
@@ -294,6 +308,101 @@
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
+
+                        <!--  端口配置：输入 / 输出（可从 Halcon 过程接口一键导入）  -->
+                        <Separator Margin="0,12" Background="{DynamicResource CardBorderBrush}" />
+
+                        <Grid Margin="0,0,0,8">
+                            <StackPanel Orientation="Horizontal">
+                                <materialDesign:PackIcon
+                                    Width="14"
+                                    Height="14"
+                                    VerticalAlignment="Center"
+                                    Foreground="{DynamicResource PrimaryBrush}"
+                                    Kind="SwapHorizontal" />
+                                <TextBlock
+                                    Margin="8,0,0,0"
+                                    FontSize="13"
+                                    FontWeight="SemiBold"
+                                    Foreground="{DynamicResource TextPrimaryBrush}"
+                                    Text="步骤端口（输入 / 输出）" />
+                            </StackPanel>
+                            <StackPanel HorizontalAlignment="Right" Orientation="Horizontal">
+                                <Button
+                                    Height="24"
+                                    Padding="8,0"
+                                    Command="{Binding QueryInterfaceCommand}"
+                                    CommandParameter="{Binding SelectedStep}"
+                                    Content="从过程接口导入"
+                                    FontSize="10"
+                                    Style="{StaticResource ControlButton}"
+                                    ToolTip="读取选中步骤的过程接口，自动铺出 Image / 算法参数 / out{i} / box{i} 等端口" />
+                                <Button
+                                    Height="24"
+                                    Margin="8,0,0,0"
+                                    Padding="8,0"
+                                    Command="{Binding AddPortCommand}"
+                                    CommandParameter="{Binding SelectedStep}"
+                                    Content="+ 输入"
+                                    FontSize="10"
+                                    Style="{StaticResource ControlButton}" />
+                            </StackPanel>
+                        </Grid>
+
+                        <TextBlock
+                            Margin="0,0,0,8"
+                            Style="{StaticResource MutedText}"
+                            Text="先在左侧点选一个步骤，再点「从过程接口导入」。输入端口的「值」支持字面量（128）、引用前面步骤（1.out0）或上下文（context:LaserCode）。" />
+
+                        <DataGrid
+                            AutoGenerateColumns="False"
+                            CanUserAddRows="False"
+                            CanUserDeleteRows="False"
+                            ItemsSource="{Binding SelectedStep.Ports}"
+                            MaxHeight="240">
+                            <DataGrid.Columns>
+                                <DataGridTemplateColumn Header="方向" Width="70">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <TextBlock
+                                                VerticalAlignment="Center"
+                                                FontSize="11"
+                                                Foreground="{DynamicResource TextSecondaryBrush}"
+                                                Text="{Binding Direction}" />
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                                <DataGridTextColumn Binding="{Binding Name}" Header="端口名" Width="120" />
+                                <DataGridTextColumn Binding="{Binding DataType, Mode=OneWay}" Header="类型" Width="70" IsReadOnly="True" />
+                                <DataGridTextColumn Binding="{Binding Value}" Header="值 / 引用" Width="*" />
+                                <DataGridTextColumn Binding="{Binding Description, Mode=OneWay}" Header="来源" Width="110" IsReadOnly="True" />
+                                <DataGridTemplateColumn Header="" Width="50">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <Button
+                                                Padding="4,0"
+                                                Command="{Binding DataContext.RemovePortCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                                CommandParameter="{Binding}"
+                                                Content="✕"
+                                                FontSize="10"
+                                                Style="{StaticResource MaterialDesignFlatButton}"
+                                                ToolTip="移除该端口" />
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                            </DataGrid.Columns>
+                        </DataGrid>
+
+                        <TextBlock
+                            Margin="0,6,0,0"
+                            FontSize="11"
+                            Foreground="{DynamicResource TextMutedBrush}"
+                            Text="{Binding SelectedStep.InputPortSummary, StringFormat=输入: {0}}" />
+                        <TextBlock
+                            Margin="0,2,0,0"
+                            FontSize="11"
+                            Foreground="{DynamicResource TextMutedBrush}"
+                            Text="{Binding SelectedStep.OutputPortSummary, StringFormat=输出: {0}}" />
 
                         <Separator Margin="0,12" Background="{DynamicResource CardBorderBrush}" />
 

@@ -11,7 +11,7 @@ namespace WorkBench.Core
     public class WorkflowEngine : IWorkflowEngine
     {
         private readonly ILogger _logger;
-        private readonly IServiceProvider _serviceProvider;
+        private readonly IServiceProvider? _serviceProvider;
         private CancellationTokenSource? _currentCts;
         private readonly object _runLock = new();
 
@@ -22,7 +22,13 @@ namespace WorkBench.Core
         public event EventHandler<AggregatedResult>? WorkflowCompleted;
         public event EventHandler<string>? WorkflowError;
 
-        public WorkflowEngine(ILogger logger, IServiceProvider serviceProvider)
+        /// <summary>
+        /// 说明：<paramref name="serviceProvider"/> 目前**未被使用** —— 步骤的外部依赖
+        /// （PLC / MES）由 WorkBenchViewModel 在构建步骤时显式注入
+        ///（见 PLCWriteStep / MESUploadStep 的构造函数）。
+        /// 这里保留可空参数只是为了兼容既有注册方式。
+        /// </summary>
+        public WorkflowEngine(ILogger logger, IServiceProvider? serviceProvider = null)
         {
             _logger = logger.ForContext<WorkflowEngine>();
             _serviceProvider = serviceProvider;

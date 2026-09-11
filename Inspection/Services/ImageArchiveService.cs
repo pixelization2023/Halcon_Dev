@@ -152,6 +152,26 @@ namespace Inspection.Services
             return Path.Combine(dir, name);
         }
 
+        /// <summary>
+        /// 生成**原图**（未标注）路径，布局：{根目录}\{yyyyMMdd}\{图片名}-{条码}.bmp
+        ///
+        /// 与 <see cref="BuildResultPath"/> 对称：同样过滤非法文件名字符。
+        /// 这一处是修复而非等价抽取 —— 原实现把扫码结果直接拼进文件名，
+        /// 条码里一旦含 <c>/ : * ? " &lt; &gt; |</c> 等字符，Halcon 写图就会失败，
+        /// 而该 PCS 的原图只会留一条 Warning 日志，现场很难定位。
+        /// </summary>
+        public static string BuildOriginalPath(string root, string photoName, string code)
+        {
+            if (string.IsNullOrWhiteSpace(root))
+                throw new ArgumentException("存图根目录为空", nameof(root));
+
+            var dir = Path.Combine(root, DateTime.Now.ToString("yyyyMMdd"));
+            Directory.CreateDirectory(dir);
+
+            var name = Sanitize($"{photoName}-{code}.bmp");
+            return Path.Combine(dir, name);
+        }
+
         /// <summary>清理过期图片（原 FileOperations.CleanFile）</summary>
         public int CleanupExpired(string root, int retentionDays)
         {

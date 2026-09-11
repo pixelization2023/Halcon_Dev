@@ -1,0 +1,199 @@
+<Window
+    x:Class="MultiCameraSystem.Views.SplashWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+    Title="CCD 视觉检测系统 · 启动中"
+    Width="620"
+    Height="380"
+    WindowStartupLocation="CenterScreen"
+    WindowStyle="None"
+    ResizeMode="NoResize"
+    ShowInTaskbar="True"
+    Topmost="True"
+    Background="#FF0D1117"
+    TextOptions.TextFormattingMode="Display"
+    UseLayoutRounding="True">
+
+    <!--
+        启动窗口（Splash）。
+
+        为什么需要它：旧实现的"加载界面"（CustomControl/Views/LoadingUserControl）虽然做出来了，
+        但**全仓没有任何地方调用**，而且它的进度条是一个假的 DispatcherTimer（和服务加载无关）。
+        真正的服务初始化（相机 SDK / 数据库 / PLC / Halcon 预热 / 检测宿主）无声地跑在
+        App.OnInitialized 里，失败了只会 Environment.Exit(1) —— 现场看到的是"程序闪一下就没了"。
+
+        这个窗口由 App.CreateShell() 在返回主窗口之前显示，配合 AppStartupService 按步骤报告真实进度，
+        失败时给出明确原因并允许"仍然继续（降级启动）"。
+
+        注意：本窗口刻意**不使用** DynamicResource 主题画刷 —— 它出现的时机早于主题应用，
+        引用主题键会取到空值。这里用固定深色配色。
+    -->
+
+    <Border BorderBrush="#FF1F2A30" BorderThickness="1">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <!--  头部：渐变标识条  -->
+            <Border Grid.Row="0" Padding="26,20">
+                <Border.Background>
+                    <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                        <GradientStop Offset="0" Color="#FF00BCD4" />
+                        <GradientStop Offset="1" Color="#FF7C4DFF" />
+                    </LinearGradientBrush>
+                </Border.Background>
+                <StackPanel Orientation="Horizontal">
+                    <materialDesign:PackIcon
+                        Width="30"
+                        Height="30"
+                        VerticalAlignment="Center"
+                        Foreground="White"
+                        Kind="CameraIris" />
+                    <StackPanel Margin="14,0,0,0" VerticalAlignment="Center">
+                        <TextBlock
+                            FontSize="19"
+                            FontWeight="Bold"
+                            Foreground="White"
+                            Text="CCD 视觉检测系统" />
+                        <TextBlock
+                            Margin="0,3,0,0"
+                            FontSize="11.5"
+                            Foreground="#DFFFFFFF"
+                            Text="正在加载系统组件，请稍候…" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <!--  中部：步骤清单  -->
+            <Grid Grid.Row="1" Margin="26,18,26,0">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto">
+                    <ItemsControl x:Name="StepList" ItemsSource="{Binding Steps}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Grid Margin="0,0,0,7">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="26" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+
+                                    <!--  状态图标  -->
+                                    <TextBlock
+                                        Grid.Column="0"
+                                        VerticalAlignment="Center"
+                                        FontSize="13"
+                                        Text="{Binding Glyph}">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="Foreground" Value="#FF6B7A85" />
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding State}" Value="Running">
+                                                        <Setter Property="Foreground" Value="#FF00BCD4" />
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding State}" Value="Success">
+                                                        <Setter Property="Foreground" Value="#FF00E676" />
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding State}" Value="Warn">
+                                                        <Setter Property="Foreground" Value="#FFFFAB40" />
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding State}" Value="Failed">
+                                                        <Setter Property="Foreground" Value="#FFFF5252" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+
+                                    <StackPanel Grid.Column="1">
+                                        <TextBlock FontSize="12.5" Foreground="#FFE6EDF3" Text="{Binding Title}" />
+                                        <TextBlock
+                                            Margin="0,2,0,0"
+                                            FontSize="11"
+                                            Foreground="#FF8B98A5"
+                                            Text="{Binding Detail}"
+                                            TextWrapping="Wrap" />
+                                    </StackPanel>
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+
+                <!--  失败时的操作区  -->
+                <StackPanel
+                    x:Name="FailurePanel"
+                    Grid.Row="1"
+                    Margin="0,14,0,0"
+                    Visibility="Collapsed">
+                    <Border
+                        Padding="12,9"
+                        Background="#33FF5252"
+                        BorderBrush="#FF7A2B2B"
+                        BorderThickness="1"
+                        CornerRadius="6">
+                        <TextBlock
+                            FontSize="11.5"
+                            Foreground="#FFFFC9C9"
+                            Text="{Binding LastError}"
+                            TextWrapping="Wrap" />
+                    </Border>
+                    <StackPanel Margin="0,12,0,0" HorizontalAlignment="Right" Orientation="Horizontal">
+                        <Button
+                            x:Name="RetryButton"
+                            MinWidth="110"
+                            Padding="14,7"
+                            Background="#FF00BCD4"
+                            BorderThickness="0"
+                            Click="OnRetryClick"
+                            Content="重试"
+                            Cursor="Hand"
+                            Foreground="White" />
+                        <Button
+                            x:Name="ContinueButton"
+                            MinWidth="150"
+                            Margin="10,0,0,0"
+                            Padding="14,7"
+                            Background="#FF2A3A42"
+                            BorderThickness="0"
+                            Click="OnContinueClick"
+                            Content="仍要继续（降级启动）"
+                            Cursor="Hand"
+                            Foreground="#FFDCE5EA"
+                            ToolTip="相机/数据库/MES 等非致命步骤失败时可以继续；Halcon 运行时失败不建议继续" />
+                    </StackPanel>
+                </StackPanel>
+            </Grid>
+
+            <!--  底部：总进度  -->
+            <StackPanel Grid.Row="2" Margin="26,18,26,22">
+                <ProgressBar
+                    x:Name="TotalProgress"
+                    Height="6"
+                    Maximum="100"
+                    Foreground="#FF00BCD4"
+                    Background="#FF1B272E"
+                    BorderThickness="0" />
+                <Grid Margin="0,9,0,0">
+                    <TextBlock
+                        FontSize="11"
+                        Foreground="#FF8B98A5"
+                        Text="{Binding StatusMessage}" />
+                    <TextBlock
+                        HorizontalAlignment="Right"
+                        FontFamily="Consolas"
+                        FontSize="11"
+                        Foreground="#FF8B98A5"
+                        Text="{Binding ProgressText}" />
+                </Grid>
+            </StackPanel>
+        </Grid>
+    </Border>
+</Window>

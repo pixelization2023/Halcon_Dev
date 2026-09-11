@@ -38,11 +38,11 @@ namespace Inspection.ViewModels
             _session = session;
             _logger = logger.ForContext<DashboardViewModel>();
 
-            _orchestrator.ProgressChanged += OnProgressChanged;
-            _orchestrator.PcsCompleted += OnPcsCompleted;
-            _orchestrator.StatusChanged += OnStatusChanged;
-            _orchestrator.SheetUploaded += OnSheetUploaded;
-            _status.Updated += OnStatusUpdated;
+            // 事件订阅统一放到 Subscribe()/Unsubscribe() 里成对管理（见那两个方法）。
+            // 之前这里是构造函数直接 += 、从不退订，而这个 ViewModel 的
+            // IsNavigationTarget => true（Prism 会复用同一实例），
+            // 于是每次重新导航都会再订阅一遍 —— 处理器被重复调用、旧实例也回收不掉。
+            Subscribe();
 
             StartCommand = new DelegateCommand(ExecuteStart);
             StopCommand = new DelegateCommand(async () => await ExecuteStopAsync());
@@ -58,10 +58,50 @@ namespace Inspection.ViewModels
                      })
                 Indicators.Add(indicator);
 
-            // 图表画笔必须由代码构造，主题变化时重建（颜色取自共享内核，保证与全站同源）
-            ThemePalette.Changed += (_, _) => RunOnUi(RebuildCharts);
+            // 图表画笔必须由代码构造，主题变化时重建（颜色取自共享内核，保证与全站同源）。
+            // 保存成字段而不是内联 lambda：内联 lambda 无法退订，
+            // 而 ThemePalette.Changed 是**静态事件** —— 不退订就是永久泄漏。
+            ThemePalette.Changed += OnThemePaletteChanged;
             RebuildCharts();
         }
+
+        /// <summary>是否已订阅（防止重复订阅）</summary>
+        private bool _subscribed;
+
+        /// <summary>订阅编排器 / 状态监视 / 主题事件</summary>
+        private void Subscribe()
+        {
+            if (_subscribed) return;
+            _subscribed = true;
+
+            _orchestrator.ProgressChanged += OnProgressChanged;
+            _orchestrator.PcsCompleted += OnPcsCompleted;
+            _orchestrator.StatusChanged += OnStatusChanged;
+            _orchestrator.SheetUploaded += OnSheetUploaded;
+            // 产品加载/切换后按新方案的显示设置重建窗口
+            _orchestrator.ProductLoaded += OnProductLoaded;
+            // 在「检测配置」页改完显示设置并保存后，立刻重建窗口（不必等下次加载产品）
+            _orchestrator.ConfigurationChanged += OnProductLoaded;
+            _status.Updated += OnStatusUpdated;
+        }
+
+        /// <summary>退订全部事件（与 <see cref="Subscribe"/> 严格配对）</summary>
+        private void Unsubscribe()
+        {
+            if (!_subscribed) return;
+            _subscribed = false;
+
+            _orchestrator.ProgressChanged -= OnProgressChanged;
+            _orchestrator.PcsCompleted -= OnPcsCompleted;
+            _orchestrator.StatusChanged -= OnStatusChanged;
+            _orchestrator.SheetUploaded -= OnSheetUploaded;
+            _orchestrator.ProductLoaded -= OnProductLoaded;
+            _orchestrator.ConfigurationChanged -= OnProductLoaded;
+            _status.Updated -= OnStatusUpdated;
+        }
+
+        /// <summary>主题变化时重建图表（静态事件必须用字段引用才能退订）</summary>
+        private void OnThemePaletteChanged(object? sender, EventArgs e) => RunOnUi(RebuildCharts);
 
         #region 图表（LiveCharts2）
 
@@ -186,6 +226,80 @@ namespace Inspection.ViewModels
         public ObservableCollection<PcsInspectionResult> PcsResults { get; } = new();
         public ObservableCollection<string> Events { get; } = new();
 
+        // ================= 多窗口显示（见 Docs/多窗口显示与检测流程方案.md 第 2 节） =================
+
+        /// <summary>
+        /// 多窗口显示的窗口集合。窗口个数、每行列数、每个窗口绑定哪个 PCS
+        /// 都来自产品方案的 <see cref="ProductConfiguration.Display"/>。
+        /// </summary>
+        public ObservableCollection<PcsDisplayWindowViewModel> DisplayWindows { get; } = new();
+
+        /// <summary>UniformGrid 的列数（绑定到视图）</summary>
+        public int DisplayColumns => _orchestrator.Configuration?.Display.ResolveColumns() ?? 2;
+
+        /// <summary>单格高度（按宽高比推算，避免每格被拉成异形）</summary>
+        public double DisplayTileHeight => 200;
+
+        /// <summary>是否已有可见的显示窗口</summary>
+        public bool HasDisplayWindows => DisplayWindows.Count > 0;
+
+        /// <summary>是否没有配置任何显示窗口（视图用它显示兜底提示）</summary>
+        public bool HasNoDisplayWindows => DisplayWindows.Count == 0;
+
+        /// <summary>显示窗口数（卡片标题里显示）</summary>
+        public int DisplayWindowCount => DisplayWindows.Count;
+
+        /// <summary>
+        /// 按当前产品方案的显示设置重建窗口集合。
+        /// 窗口数变化时只做"先加后减"，避免一次性清空导致的界面抖动与句柄集中释放。
+        /// </summary>
+        public void RebuildDisplayWindows()
+        {
+            var settings = _orchestrator.Configuration?.Display;
+            if (settings == null)
+            {
+                DisplayWindows.Clear();
+            }
+            else
+            {
+                settings.Normalize();
+                var target = settings.Windows.Take(DisplaySettings.MaxWindowCount).ToList();
+
+                // 裁掉多余的（从尾部开始）
+                while (DisplayWindows.Count > target.Count)
+                    DisplayWindows.RemoveAt(DisplayWindows.Count - 1);
+
+                // 补齐缺的
+                for (int i = DisplayWindows.Count; i < target.Count; i++)
+                    DisplayWindows.Add(new PcsDisplayWindowViewModel(target[i]));
+
+                // 已存在的窗口：**必须把新规则灌进去**，否则用户在配置页改的
+                // 绑定方式 / 图像来源 / NG 框样式不会生效（窗口还拿着构造时的旧 spec）
+                for (int i = 0; i < DisplayWindows.Count && i < target.Count; i++)
+                    DisplayWindows[i].SetSpec(target[i]);
+            }
+
+            RaisePropertyChanged(nameof(DisplayColumns));
+            RaisePropertyChanged(nameof(HasDisplayWindows));
+            RaisePropertyChanged(nameof(HasNoDisplayWindows));
+            RaisePropertyChanged(nameof(DisplayWindowCount));
+        }
+
+        /// <summary>把一条 PCS 结果分发到所有匹配的窗口</summary>
+        private void DispatchToDisplayWindows(PcsInspectionResult result)
+        {
+            foreach (var window in DisplayWindows)
+            {
+                if (window.Match(result)) window.Attach(result);
+            }
+        }
+
+        /// <summary>清空所有显示窗口（换料 / 清除数据时）</summary>
+        private void ClearDisplayWindows()
+        {
+            foreach (var window in DisplayWindows) window.Clear();
+        }
+
         #endregion
 
         #region 绑定属性
@@ -288,20 +402,23 @@ namespace Inspection.ViewModels
         }
 
         private HObject? _currentImage;
-        /// <summary>当前显示图像（HalconView 的 HImage 绑定目标）</summary>
+        /// <summary>
+        /// 当前显示的图像（HalconView 的 HImage 绑定目标）。
+        ///
+        /// 生命周期约定（重要）：
+        /// 这里存的是 <see cref="PcsInspectionResult.OutputImage"/> 的**引用**，所有权属于
+        /// <see cref="InspectionOrchestrator"/>，由它的 ClearSheet() 统一释放。
+        /// 本类**不得**释放它 —— 改成多窗口显示后，同一张图会被多个窗口同时引用，
+        /// 谁释放谁就把别人的显示打断（旧实现就是在这里 Dispose 上一张，
+        /// 导致 PcsResults 表里留下已释放句柄）。
+        /// </summary>
         public HObject? CurrentImage
         {
             get => _currentImage;
             private set
             {
-                var previous = _currentImage;
                 if (SetProperty(ref _currentImage, value))
-                {
                     RaisePropertyChanged(nameof(HasImage));
-
-                    if (previous != null && !ReferenceEquals(previous, value))
-                        DisposeLater(previous);
-                }
             }
         }
 
@@ -348,6 +465,8 @@ namespace Inspection.ViewModels
         {
             _orchestrator.ClearSheet();
             PcsResults.Clear();
+            ClearDisplayWindows();
+            CurrentImage = null;
             AppendEvent("数据已清除");
         }
 
@@ -361,6 +480,8 @@ namespace Inspection.ViewModels
 
             _orchestrator.ClearSheet();
             PcsResults.Clear();
+            ClearDisplayWindows();
+            CurrentImage = null;
 
             var ok = await _plc.SignalUploadCompletedAsync();
             AppendEvent(ok ? "PLC 初始化出板信号已发送！" : "PLC 信号发送失败");
@@ -382,10 +503,23 @@ namespace Inspection.ViewModels
                 VisionElapsed = summary.VisionElapsedMs + "ms";
                 UploadElapsed = summary.UploadElapsedMs + "ms";
 
-                if (summary.ProcessedPcs == 0) _elapsedTrend.Clear();
+                if (summary.ProcessedPcs == 0)
+                {
+                    _elapsedTrend.Clear();
+                    // 新的一张料开始：清空所有显示窗口，避免上一张的图与判定残留在窗口里
+                    ClearDisplayWindows();
+                }
+
                 RebuildCharts();
             });
         }
+
+        private void OnProductLoaded(object? sender, ProductConfiguration configuration)
+            => RunOnUi(() =>
+            {
+                RebuildDisplayWindows();
+                ClearDisplayWindows();
+            });
 
         private void OnPcsCompleted(object? sender, PcsInspectionResult result)
         {
@@ -394,8 +528,14 @@ namespace Inspection.ViewModels
                 PcsResults.Insert(0, result);
                 while (PcsResults.Count > 200) PcsResults.RemoveAt(PcsResults.Count - 1);
 
+                // 多窗口分发：每个窗口按自己的绑定规则决定要不要这张图
+                DispatchToDisplayWindows(result);
+
+                // 单窗口兼容路径：HalconView 只持引用、不释放（见 CurrentImage 的注释）
                 if (result.OutputImage != null && result.OutputImage.IsInitialized())
                     CurrentImage = result.OutputImage;
+                else if (result.SourceImage != null && result.SourceImage.IsInitialized())
+                    CurrentImage = result.SourceImage;
 
                 // 耗时趋势（按时间顺序追加，只保留最近 N 点）
                 _elapsedTrend.Add(result.ElapsedMs);
@@ -473,26 +613,25 @@ namespace Inspection.ViewModels
                 dispatcher.BeginInvoke(action, DispatcherPriority.Background);
         }
 
-        private static void DisposeLater(HObject image)
-        {
-            var dispatcher = Application.Current?.Dispatcher;
-            if (dispatcher == null)
-            {
-                image.Dispose();
-                return;
-            }
-
-            dispatcher.BeginInvoke(() => image.Dispose(), DispatcherPriority.ApplicationIdle);
-        }
-
         #endregion
 
         #region INavigationAware
 
         public void OnNavigatedTo(NavigationContext navigationContext)
         {
-            _orchestrator.Start();
+            // 注意：**不要**在这里无条件 Start()。
+            // 旧实现在每次进入页面时都调 _orchestrator.Start()，含义是"一进监控台就开始消费图像队列"，
+            // 操作员还没点「开始运行」设备就已经在跑了；而且 Start() 内部有 `if (_worker != null) return;`
+            // 的守卫，所以点「停止」之后再回到这一页又会把它偷偷启动起来 —— 停止按钮等于失效。
+            // 正确行为：运行的启停只由「开始运行 / 停止」按钮控制，这里只同步显示状态。
+            // 重新进入页面时恢复订阅（OnNavigatedFrom 里退订了，这里成对补回）。
+            // Subscribe() 自带幂等保护，首次进入不会重复订阅。
+            Subscribe();
+
             IsRunning = _orchestrator.IsRunning;
+
+            // 进入页面时按当前方案重建显示窗口（首次进入时 ProductLoaded 可能已经错过）
+            RebuildDisplayWindows();
 
             RaisePropertyChanged(nameof(ProductName));
             RaisePropertyChanged(nameof(SolutionName));
@@ -502,7 +641,15 @@ namespace Inspection.ViewModels
 
         public bool IsNavigationTarget(NavigationContext navigationContext) => true;
 
-        public void OnNavigatedFrom(NavigationContext navigationContext) { }
+        /// <summary>
+        /// 离开页面时退订。
+        ///
+        /// 为什么必须做：本类 <see cref="IsNavigationTarget"/> 返回 true，Prism 会**复用同一实例**，
+        /// 但"离开页面"并不等于"实例被销毁"。旧实现在构造函数里订阅、从不退订，
+        /// 于是每进出一次就多一份订阅 —— 日志会重复、图表白重建，实例也永远回收不掉。
+        /// 与 <see cref="Subscribe"/> 严格配对。
+        /// </summary>
+        public void OnNavigatedFrom(NavigationContext navigationContext) => Unsubscribe();
 
         #endregion
     }

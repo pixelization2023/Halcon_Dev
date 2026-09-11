@@ -71,18 +71,14 @@ namespace Halcon.Core
             _logger = logger ?? ResolveLogger();
         }
 
-        private static ILogger ResolveLogger()
-        {
-            try
-            {
-                return MVS.Core.AppContainer.Resolve<ILogger>() ?? Serilog.Log.Logger;
-            }
-            catch
-            {
-                // 容器尚未初始化（例如单元测试或设计期），退回到全局静态 logger
-                return Serilog.Log.Logger;
-            }
-        }
+        /// <summary>
+        /// 解析日志器。
+        ///
+        /// 解耦要点：**不再走 MVS.Core.AppContainer**（静态容器定位器）。
+        /// 外壳已把容器 logger 提升为 <c>Serilog.Log.Logger</c>（两者同一实例），
+        /// 所以直接用全局静态 logger 即可：永远不为 null，且不依赖"容器是否已就绪"这一隐式时序契约。
+        /// </summary>
+        private static ILogger ResolveLogger() => Serilog.Log.Logger;
 
         #region 引擎初始化与配置
 

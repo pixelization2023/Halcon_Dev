@@ -21,10 +21,10 @@ namespace WorkBench.Steps
             _logger = Serilog.Log.Logger.ForContext<InspectionStep>();
         }
 
-        public override async Task<bool> ValidateAsync(IInspectionContext context)
+        public override Task<bool> ValidateAsync(IInspectionContext context)
         {
-            return !string.IsNullOrEmpty(_programName) &&
-                   context.GetImage("Camera1") != null;
+            return Task.FromResult(!string.IsNullOrEmpty(_programName) &&
+                                   context.GetImage("Camera1") != null);
         }
 
         public override async Task<StepResult> ExecuteAsync(IInspectionContext context, CancellationToken ct)

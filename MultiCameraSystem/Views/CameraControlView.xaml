@@ -3,6 +3,7 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:convert="clr-namespace:MultiCameraSystem.Convert"
+    xmlns:attached="clr-namespace:HalconView.AttachedProperties;assembly=HalconView"
     xmlns:halconView="clr-namespace:HalconView;assembly=HalconView"
     xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
     xmlns:prism="http://prismlibrary.com/"
@@ -185,7 +186,11 @@
             <Border Grid.Column="1" Padding="0" Background="{DynamicResource CanvasBrush}"
                     Style="{StaticResource CardBorder}">
                 <Grid>
-                    <halconView:HalconView x:Name="HalconDisplay" HImage="{Binding Hobjeimage, Mode=OneWay}" />
+                    <!--  句柄回传：与 RunView / TestView 保持一致，否则 ViewModel 拿不到 HWindow，
+                          后续在图上画框/量测都没有入口  -->
+                    <halconView:HalconView x:Name="HalconDisplay"
+                                           HImage="{Binding Hobjeimage, Mode=OneWay}"
+                                           attached:HalconWindowAttachedProperties.WindowReadyCommand="{Binding WindowReadyCommand}" />
 
                     <Border Background="{DynamicResource ScrimBrush}" CornerRadius="8"
                             Visibility="{Binding HasImage, Converter={StaticResource InverseBooleanToVisibilityConverter}}">

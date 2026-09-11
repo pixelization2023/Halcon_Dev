@@ -6,6 +6,18 @@
     xmlns:prism="http://prismlibrary.com/"
     prism:ViewModelLocator.AutoWireViewModel="True">
 
+    <!--
+        权限模型：整页 IsEnabled 绑定到 CanEdit（= 工程师及以上）。
+        未登录 / 操作员登录时整页进入只读（按钮、输入框、可编辑表格全部禁用，文字仍可阅读）。
+        这就是"不登录能运行查看、但没有修改权限"，而不是"不许进这个页面"。
+        WPF 的 IsEnabled 会向下级联，所以一处绑定即可覆盖全页可交互控件。
+    -->
+    <UserControl.Style>
+        <Style TargetType="UserControl">
+            <Setter Property="IsEnabled" Value="{Binding CanEdit}" />
+        </Style>
+    </UserControl.Style>
+
     <StackPanel>
         <TextBlock Style="{StaticResource PageTitle}" Text="检测配方配置" />
         <TextBlock Style="{StaticResource MutedText}" Text="把 Halcon 过程（原 VisionMaster 流程）与图片索引、PCS 个数、检测项目数绑定；扫码流程的过程名需包含「扫码」。" />
@@ -57,9 +69,15 @@
         <Border Margin="0,16,0,0" Style="{StaticResource CardBorder}">
             <StackPanel>
                 <TextBlock Style="{StaticResource SectionTitle}" Text="流程绑定列表" />
+                <!--
+                    编辑型表格：列绑定到 InspectionRecipe 的可写属性（就地修改即生效），不能设 IsReadOnly。
+                    权限用 IsEnabled 表达：未登录时整张表禁用（会级联到单元格编辑器），
+                    也就是"不登录 = 能看不能改"，而不是"不许进这个页面"。
+                -->
                 <DataGrid
                     AutoGenerateColumns="False"
                     CanUserAddRows="False"
+                    CanUserDeleteRows="False"
                     ItemsSource="{Binding Recipes}"
                     MaxHeight="280">
                     <DataGrid.Columns>
@@ -69,6 +87,7 @@
                         <DataGridTextColumn Binding="{Binding ItemCount}" Header="检测项目数" Width="110" />
                         <DataGridTextColumn Binding="{Binding ResultOutputPattern}" Header="结果输出模板" Width="140" />
                         <DataGridTextColumn Binding="{Binding BoxOutputPattern}" Header="框输出模板" Width="140" />
+                        <DataGridTextColumn Binding="{Binding TimeoutMs}" Header="超时(ms, 0=默认60s)" Width="150" />
                         <DataGridTemplateColumn Header="操作" Width="90">
                             <DataGridTemplateColumn.CellTemplate>
                                 <DataTemplate>
@@ -90,6 +109,12 @@
                         Style="{StaticResource ControlButton}" />
                     <Button
                         Margin="10,0,0,0"
+                        Command="{Binding ValidateInterfaceCommand}"
+                        Content="校验配方↔方案一致性"
+                        Style="{StaticResource ControlButton}"
+                        ToolTip="逐条比对配方里的输出名模板与 .hdev 实际声明的参数名；名字对不上会导致界面无图、结果串为空" />
+                    <Button
+                        Margin="10,0,0,0"
                         Command="{Binding DiscoverProceduresCommand}"
                         Content="扫描方案文件"
                         Style="{StaticResource ControlButton}" />
@@ -106,6 +131,21 @@
                     FontSize="12"
                     Foreground="{DynamicResource TextSecondaryBrush}"
                     Text="{Binding InterfaceInfo}" />
+
+                <!--  一致性校验清单：有问题时逐条列出（✘ 前缀），全对时显示 ✔  -->
+                <ItemsControl Margin="0,10,0,0" ItemsSource="{Binding InterfaceIssues}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <TextBlock
+                                Margin="0,3"
+                                FontFamily="Consolas"
+                                FontSize="12"
+                                Foreground="{DynamicResource TextSecondaryBrush}"
+                                Text="{Binding}"
+                                TextWrapping="Wrap" />
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
             </StackPanel>
         </Border>
 
@@ -198,6 +238,113 @@
                 </StackPanel>
             </Border>
         </Grid>
+
+        <!--  ============ 多窗口显示设置（检测主监控台的实时图像区） ============  -->
+        <Border Margin="0,16,0,0" Style="{StaticResource CardBorder}">
+            <StackPanel>
+                <TextBlock Style="{StaticResource SectionTitle}" Text="图像显示（检测主监控台的多窗口）" />
+                <TextBlock
+                    Margin="0,6,0,12"
+                    Style="{StaticResource MutedText}"
+                    Text="决定主监控台「实时图像」区显示几个 Halcon 窗口，以及每个窗口绑定哪一个 PCS。改完必须点「保存配置」。" />
+
+                <StackPanel Orientation="Horizontal">
+                    <CheckBox
+                        VerticalAlignment="Center"
+                        Content="启用多窗口"
+                        IsChecked="{Binding DisplayEnabled, Mode=TwoWay}" />
+                    <TextBlock
+                        Margin="24,0,8,0"
+                        VerticalAlignment="Center"
+                        Style="{StaticResource DataLabel}"
+                        Text="窗口个数" />
+                    <TextBox
+                        Width="60"
+                        materialDesign:HintAssist.Hint="1~16"
+                        Style="{StaticResource DarkTextBox}"
+                        Text="{Binding DisplayWindowCount, UpdateSourceTrigger=LostFocus}" />
+                    <TextBlock
+                        Margin="20,0,8,0"
+                        VerticalAlignment="Center"
+                        Style="{StaticResource DataLabel}"
+                        Text="每行列数" />
+                    <TextBox
+                        Width="60"
+                        materialDesign:HintAssist.Hint="0=自动"
+                        Style="{StaticResource DarkTextBox}"
+                        Text="{Binding DisplayColumns, UpdateSourceTrigger=LostFocus}" />
+                    <TextBlock
+                        Margin="20,0,8,0"
+                        VerticalAlignment="Center"
+                        Style="{StaticResource DataLabel}"
+                        Text="空窗显示" />
+                    <ComboBox
+                        Width="130"
+                        ItemsSource="{Binding EmptyModes}"
+                        SelectedItem="{Binding EmptyWindowMode, Mode=TwoWay}" />
+                </StackPanel>
+
+                <!--  编辑型表格：就地改每个窗口的绑定规则  -->
+                <DataGrid
+                    Margin="0,14,0,0"
+                    AutoGenerateColumns="False"
+                    CanUserAddRows="False"
+                    CanUserDeleteRows="False"
+                    ItemsSource="{Binding DisplayWindows}"
+                    MaxHeight="260">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Binding="{Binding Index, Mode=OneWay}" Header="窗口" Width="60" IsReadOnly="True" />
+                        <DataGridTextColumn Binding="{Binding Title}" Header="标题（留空自动）" Width="120" />
+                        <DataGridTemplateColumn Header="绑定方式" Width="130">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <ComboBox
+                                        ItemsSource="{Binding DataContext.BindModes, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                        SelectedItem="{Binding Bind, UpdateSourceTrigger=PropertyChanged}" />
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+                        <DataGridTextColumn Binding="{Binding Target}" Header="绑定目标（PCS/键/图片序号）" Width="180" />
+                        <DataGridTemplateColumn Header="图像来源" Width="120">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <ComboBox
+                                        ItemsSource="{Binding DataContext.ImageSources, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                        SelectedItem="{Binding Source, UpdateSourceTrigger=PropertyChanged}" />
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+                        <DataGridCheckBoxColumn Binding="{Binding ShowNgBoxes, UpdateSourceTrigger=PropertyChanged}" Header="NG 框" Width="70" />
+                        <DataGridCheckBoxColumn Binding="{Binding ShowItemText, UpdateSourceTrigger=PropertyChanged}" Header="项文本" Width="70" />
+                        <DataGridTemplateColumn Header="只看" Width="100">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <ComboBox
+                                        ItemsSource="{Binding DataContext.JudgmentFilters, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                        SelectedItem="{Binding Filter, UpdateSourceTrigger=PropertyChanged}" />
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+                        <DataGridTextColumn Binding="{Binding BoxColor}" Header="框色 #RRGGBB" Width="120" />
+                        <DataGridTextColumn Binding="{Binding BoxLineWidth}" Header="线宽" Width="60" />
+                        <DataGridTemplateColumn Header="缩放" Width="90">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <ComboBox
+                                        ItemsSource="{Binding DataContext.ScaleModes, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                        SelectedItem="{Binding Scale, UpdateSourceTrigger=PropertyChanged}" />
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+                    </DataGrid.Columns>
+                </DataGrid>
+
+                <TextBlock
+                    Margin="0,10,0,0"
+                    Style="{StaticResource MutedText}"
+                    Text="绑定方式：按 PCS 序号 / 按上传顺序键 / 按来源图片序号 / 跟随最新。绑定目标填对应序号或键值；「跟随最新」会忽略绑定目标。框色留空表示用红色。" />
+            </StackPanel>
+        </Border>
 
         <TextBlock
             Margin="0,14,0,0"
